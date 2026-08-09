@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acestream HDHomeRun Proxy - Admin</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: #334155;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 2rem;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border);
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        select, input[type="text"] {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-size: 1rem;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        select:focus, input[type="text"]:focus {
+            border-color: var(--primary);
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 1px solid var(--border);
+            margin-top: 1rem;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--border);
+        }
+
+        .status {
+            margin-top: 2rem;
+            padding: 1rem;
+            border-radius: 6px;
+            background-color: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: var(--success);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transform: translateX(150%);
+            transition: transform 0.3s ease-out;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+        
+        .table-container {
+            margin-top: 2rem;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: rgba(0,0,0,0.2);
+            position: sticky;
+            top: 0;
+        }
+        
+        tr:hover {
+            background-color: rgba(255,255,255,0.05);
+        }
+        
+        .toast.error {
+            background-color: var(--danger);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="toast" id="toast">Configuration saved successfully!</div>
+
+    <div class="container">
+        <div class="card">
+            <h1>Acestream Proxy Settings</h1>
+            <p class="subtitle">Configure your M3U or scrape source to emulate HDHomeRun</p>
+
+            <form id="configForm">
+                <div class="form-group">
+                    <label for="source_type">Source Type</label>
+                    <select id="source_type" name="source_type">
+                        <option value="m3u" {% if config.source_type == 'm3u' %}selected{% endif %}>M3U Playlist URL</option>
+                        <option value="scrape" {% if config.source_type == 'scrape' %}selected{% endif %}>Webpage URL (Scrape for links)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="source_url">URL</label>
+                    <input type="text" id="source_url" name="source_url" placeholder="https://example.com/playlist.m3u" value="{{ config.source_url }}">
+                </div>
+
+                <button type="submit" class="btn" id="saveBtn">Save & Refresh Channels</button>
+                <button type="button" class="btn btn-secondary" id="refreshBtn">Manual Refresh</button>
+            </form>
+
+            <div class="status">
+                <div>
+                    <strong>Status:</strong> Active
+                </div>
+                <div>
+                    <span id="channelCount">{{ channels_count }}</span> Channels Loaded
+                </div>
+            </div>
+            
+            <div style="margin-top: 2rem;">
+                <h2>Active Streams</h2>
+                <div class="table-container" style="margin-top: 1rem; max-height: 200px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Channel</th>
+                                <th>Viewers</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activeStreamsBody">
+                            <tr><td colspan="2" style="text-align: center; color: var(--text-muted);">No active streams</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Channel Name</th>
+                        </tr>
+                    </thead>
+                    <tbody id="channelTableBody">
+                        <tr><td colspan="2" style="text-align: center;">Loading channels...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            if(isError) toast.classList.add('error');
+            else toast.classList.remove('error');
+            
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        async function loadChannelsTable() {
+            const tbody = document.getElementById('channelTableBody');
+            try {
+                const res = await fetch('/lineup.json');
+                const channels = await res.json();
+                
+                if (channels.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="2" style="text-align: center;">No channels loaded.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = channels.map(c => 
+                    `<tr>
+                        <td>${c.GuideNumber}</td>
+                        <td>${c.GuideName}</td>
+                    </tr>`
+                ).join('');
+            } catch (err) {
+                tbody.innerHTML = '<tr><td colspan="2" style="text-align: center; color: var(--danger);">Error loading channels</td></tr>';
+            }
+        }
+
+        document.getElementById('configForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('saveBtn');
+            btn.textContent = 'Saving...';
+            btn.disabled = true;
+
+            const payload = {
+                source_type: document.getElementById('source_type').value,
+                source_url: document.getElementById('source_url').value
+            };
+
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if(data.status === 'success') {
+                    document.getElementById('channelCount').textContent = data.channels_count;
+                    showToast(data.message);
+                    loadChannelsTable();
+                } else {
+                    showToast('Failed to save config', true);
+                }
+            } catch (err) {
+                showToast('Network error', true);
+            } finally {
+                btn.textContent = 'Save & Refresh Channels';
+                btn.disabled = false;
+            }
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('refreshBtn');
+            btn.textContent = 'Refreshing...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/refresh', { method: 'POST' });
+                const data = await res.json();
+                if(data.status === 'success') {
+                    document.getElementById('channelCount').textContent = data.channels_count;
+                    showToast('Channels refreshed!');
+                    loadChannelsTable();
+                }
+            } catch (err) {
+                showToast('Failed to refresh', true);
+            } finally {
+                btn.textContent = 'Manual Refresh';
+                btn.disabled = false;
+            }
+        });
+
+        // Load table on initial page load
+        loadChannelsTable();
+        
+        async function pollActiveStreams() {
+            try {
+                const res = await fetch('/api/active_streams');
+                const streams = await res.json();
+                const tbody = document.getElementById('activeStreamsBody');
+                
+                if (streams.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="2" style="text-align: center; color: var(--text-muted);">No active streams</td></tr>';
+                } else {
+                    tbody.innerHTML = streams.map(s => 
+                        `<tr>
+                            <td><strong>${s.number}</strong> - ${s.name}</td>
+                            <td><span style="background: var(--success); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${s.clients}</span></td>
+                        </tr>`
+                    ).join('');
+                }
+            } catch (err) {
+                console.error("Failed to fetch active streams");
+            }
+        }
+        
+        // Poll every 5 seconds
+        setInterval(pollActiveStreams, 5000);
+        pollActiveStreams();
+    </script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Dashboard</h1>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <div class="card" style="text-align: center;">
+        <h3 style="color: var(--text-muted); margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Total Channels</h3>
+        <div style="font-size: 3rem; font-weight: 700; color: var(--primary); letter-spacing: -1px;">{{ channels }}</div>
+    </div>
+    
+    <div class="card" style="text-align: center;">
+        <h3 style="color: var(--text-muted); margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Sources Active</h3>
+        <div style="font-size: 3rem; font-weight: 700; color: #34C759; letter-spacing: -1px;">{{ sources }}</div>
+    </div>
+    
+    <div class="card" style="text-align: center;">
+        <h3 style="color: var(--text-muted); margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Streams Mapped</h3>
+        <div style="font-size: 3rem; font-weight: 700; color: #AF52DE; letter-spacing: -1px;">{{ streams }}</div>
+    </div>
+    
+    <div class="card" style="text-align: center;">
+        <h3 style="color: var(--text-muted); margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Clients Viewing</h3>
+        <div style="font-size: 3rem; font-weight: 700; color: #FF9500; letter-spacing: -1px;">{{ active_clients }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Quick Actions</h2>
+    <p>Use the sidebar to manage your scraping sources, map your channels to the EPG, and copy your Playlist link into IPTV Smarters Pro.</p>
+    
+    <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; font-family: monospace; word-break: break-all; margin-top: 1rem;">
+        http://{{ request.host }}/playlist.m3u
+    </div>
+</div>
+{% endblock %}

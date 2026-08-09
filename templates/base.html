@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acestream Proxy Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #000000; /* iOS/macOS true black */
+            --surface: rgba(28, 28, 30, 0.75); /* System Gray 6 with opacity for blur */
+            --surface-hover: rgba(44, 44, 46, 0.85); /* System Gray 5 */
+            --primary: #0A84FF; /* Apple Blue Dark Mode */
+            --primary-hover: #007AFF;
+            --text-main: #FFFFFF;
+            --text-muted: #EBEBF599; /* iOS secondary label */
+            --border: rgba(84, 84, 88, 0.65); /* iOS separator */
+            --danger: #FF453A; /* Apple Red Dark Mode */
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(10, 132, 255, 0.15), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(94, 92, 230, 0.15), transparent 25%);
+            background-attachment: fixed;
+        }
+
+        /* Sidebar - macOS style */
+        .sidebar {
+            width: 250px;
+            background: rgba(30, 30, 30, 0.6);
+            backdrop-filter: blur(40px) saturate(200%);
+            -webkit-backdrop-filter: blur(40px) saturate(200%);
+            border-right: 0.5px solid rgba(255, 255, 255, 0.1);
+            padding: 2.5rem 1rem;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .brand {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 2.5rem;
+            padding-left: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link {
+            padding: 0.6rem 0.8rem;
+            margin-bottom: 0.2rem;
+            border-radius: 8px;
+            color: var(--text-main);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .nav-link.active {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: 250px;
+            padding: 3rem 4rem;
+            box-sizing: border-box;
+            max-width: 1200px;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: -1px;
+            margin-bottom: 2.5rem;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Glass Cards - iOS widget style */
+        .card {
+            background: var(--surface);
+            backdrop-filter: blur(30px) saturate(200%);
+            -webkit-backdrop-filter: blur(30px) saturate(200%);
+            border: 0.5px solid rgba(255, 255, 255, 0.15);
+            border-radius: 18px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+        }
+
+        /* Forms & Inputs */
+        input, select {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 0.5px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: white;
+            font-family: inherit;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            box-sizing: border-box;
+            transition: border 0.2s;
+        }
+        
+        select option {
+            background-color: #1C1C1E; /* Solid dark background for options */
+            color: #FFFFFF;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(255,255,255,0.15);
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.4rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Buttons */
+        button, .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        button:hover, .btn:hover {
+            filter: brightness(1.1);
+            transform: scale(0.98);
+        }
+        
+        button:active, .btn:active {
+            transform: scale(0.95);
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+        }
+
+        /* Tables - macOS list style */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        th, td {
+            text-align: left;
+            padding: 1rem 0.5rem;
+            border-bottom: 0.5px solid rgba(255,255,255,0.1);
+            font-size: 0.95rem;
+        }
+        th {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="sidebar">
+        <div class="brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-main);"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            Proxy Dash
+        </div>
+        <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.path == '/dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="{{ url_for('sources') }}" class="nav-link {% if request.path == '/sources' %}active{% endif %}">Sources</a>
+        <a href="{{ url_for('channels_view') }}" class="nav-link {% if request.path == '/channels' %}active{% endif %}">Channels & EPG</a>
+        <a href="{{ url_for('settings') }}" class="nav-link {% if request.path == '/settings' %}active{% endif %}">Settings</a>
+    </div>
+
+    <div class="main-content">
+        {% block content %}{% endblock %}
+    </div>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

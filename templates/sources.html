@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Sources Manager</h1>
+
+<div class="card">
+    <h2>Add New Source</h2>
+    <form id="addSourceForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div>
+            <label>Source Name</label>
+            <input type="text" id="src_name" placeholder="e.g. Daily Scraper" required>
+        </div>
+        <div>
+            <label>Source Type</label>
+            <select id="src_type">
+                <option value="m3u">M3U Playlist URL</option>
+                <option value="scrape">Web Scrape URL</option>
+            </select>
+        </div>
+        <div style="grid-column: 1 / -1;">
+            <label>Source URL</label>
+            <input type="url" id="src_url" placeholder="http://..." required>
+        </div>
+        <div>
+            <label>Refresh Interval</label>
+            <select id="src_interval">
+                <option value="60">Every 1 Hour</option>
+                <option value="360">Every 6 Hours</option>
+                <option value="720">Every 12 Hours</option>
+                <option value="1440">Every 24 Hours</option>
+            </select>
+        </div>
+        <div style="display: flex; align-items: flex-end;">
+            <button type="submit" style="width: 100%;">Add Source</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Active Sources</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Interval</th>
+                <th>Status</th>
+                <th>Last Run</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for src in sources %}
+            <tr>
+                <td>{{ src.name }}</td>
+                <td><span style="background: rgba(59,130,246,0.2); padding: 2px 8px; border-radius: 4px; color: var(--primary);">{{ src.type | upper }}</span></td>
+                <td>Every {{ (src.interval_minutes / 60)|int }}h</td>
+                <td>{{ src.status }}</td>
+                <td>{{ src.last_run or 'Never' }}</td>
+                <td>
+                    <button class="btn" style="padding: 0.4rem 0.8rem;" onclick="refreshSource('{{ src.id }}')">Sync</button>
+                    <button class="btn btn-danger" style="padding: 0.4rem 0.8rem;" onclick="deleteSource('{{ src.id }}')">Del</button>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted);">No sources configured yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+document.getElementById('addSourceForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+        name: document.getElementById('src_name').value,
+        type: document.getElementById('src_type').value,
+        url: document.getElementById('src_url').value,
+        interval_minutes: document.getElementById('src_interval').value
+    };
+    
+    await fetch('/api/sources', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    });
+    window.location.reload();
+});
+
+async function deleteSource(id) {
+    if(confirm('Are you sure you want to delete this source?')) {
+        await fetch(`/api/sources/${id}`, { method: 'DELETE' });
+        window.location.reload();
+    }
+}
+
+async function refreshSource(id) {
+    await fetch(`/api/sources/${id}/refresh`, { method: 'POST' });
+    window.location.reload();
+}
+</script>
+{% endblock %}

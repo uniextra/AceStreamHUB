@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+venv/
+env/
+
+# App Specific Data
+config.json
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store

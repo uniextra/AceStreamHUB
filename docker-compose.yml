@@ -1,0 +1,35 @@
+services:
+  acestream-engine:
+    image: vstavrinov/acestream-engine:latest
+    container_name: acestream-engine
+    restart: unless-stopped
+    ports:
+      - "6878:6878"
+
+  acexy:
+    image: ghcr.io/javinator9889/acexy:0.2.2
+    container_name: acexy
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ACEXY_LISTEN_ADDR: ":8080"
+      ACEXY_SCHEME: "http"
+      ACEXY_HOST: "acestream-engine"
+      ACEXY_PORT: "6878"
+    depends_on:
+      - acestream-engine
+    
+  proxy-app:
+    build: .
+    container_name: acestream-hdhr-proxy
+    restart: unless-stopped
+    ports:
+      - "5004:5004"
+    environment:
+      - ACESTREAM_URL=http://acexy:8080
+    volumes:
+      - ./config.json:/app/config.json
+    depends_on:
+      - acestream-engine
+      - acexy

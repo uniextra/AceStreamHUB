@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Channels & EPG Mapping</h1>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="margin: 0;">Map to Guide</h2>
+        <button onclick="saveMappings()">Save All Mappings</button>
+    </div>
+    
+    <p style="color: var(--text-muted); margin-bottom: 2rem;">
+        Map your discovered Acestream channels to an official EPG channel ID. When mapped, the resulting M3U playlist will perfectly sync with IPTV Smarters Pro!
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Acestream Channel Name</th>
+                <th>Available Streams</th>
+                <th style="width: 40%;">EPG Channel (Guide Match)</th>
+            </tr>
+        </thead>
+        <tbody id="mappings-table">
+            {% for c in channels %}
+            <tr>
+                <td style="font-weight: 600;">{{ c.GuideName }}</td>
+                <td>{{ c.ace_ids | length }} sources</td>
+                <td>
+                    <select class="epg-select" data-channel-id="{{ c.GuideNumber }}">
+                        <option value="">-- No EPG Mapping --</option>
+                        {% for e in epg_channels %}
+                            <option value="{{ e.id }}" {% if c.mapped_epg_id == e.id %}selected{% endif %}>
+                                {{ e.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3" style="text-align: center; color: var(--text-muted);">No channels discovered yet. Go to Sources and add one!</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+async function saveMappings() {
+    const mappings = {};
+    document.querySelectorAll('.epg-select').forEach(select => {
+        const val = select.value;
+        const ch_id = select.getAttribute('data-channel-id');
+        mappings[ch_id] = val;
+    });
+    
+    const btn = event.target;
+    btn.innerText = "Saving...";
+    
+    await fetch('/api/mappings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(mappings)
+    });
+    
+    btn.innerText = "Saved!";
+    setTimeout(() => { btn.innerText = "Save All Mappings"; }, 2000);
+}
+</script>
+{% endblock %}
