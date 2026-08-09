@@ -10,21 +10,28 @@ import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request, Response, render_template, redirect, url_for, stream_with_context
 from apscheduler.schedulers.background import BackgroundScheduler
+from thefuzz import process, fuzz
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 @app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    return response
+def add_header(r):
+    r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    r.headers["Pragma"] = "no-cache"
+    r.headers["Expires"] = "0"
+    r.headers['Cache-Control'] = 'public, max-age=0'
+    response_headers = r
+    response_headers.headers.add('Access-Control-Allow-Origin', '*')
+    response_headers.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response_headers.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response_headers
 
 CONFIG_FILE = 'config.json'
 
-# Global State
+# Global Data structures
 raw_sources_db = {} # source_id -> list of channels
+epg_sources_db = {} # source_id -> list of epg_channels
 channels_db = []
 epg_channels = [] 
 scheduler = BackgroundScheduler()
@@ -143,6 +150,52 @@ def scrape_url_raw(url):
         logging.error(f"Scrape Error: {e}")
         return []
 
+def parse_json_raw(url):
+    logging.info(f"Fetching JSON from {url}")
+    try:
+        res = requests.get(url, timeout=15)
+        data = res.json()
+        raw_channels = []
+        for item in data.get('hashes', []):
+            raw_channels.append({
+                "title": item.get('title', 'Unknown'),
+                "ace_id": item.get('hash', ''),
+                "extinf": None,
+                "provided_tvg_id": item.get('tvg_id', ''),
+                "provided_logo": item.get('logo', '')
+            })
+        return raw_channels
+    except Exception as e:
+        logging.error(f"JSON Parse Error: {e}")
+        return []
+
+def parse_epg_raw(url):
+    logging.info(f"Fetching EPG from {url}")
+    try:
+        res = requests.get(url, timeout=30)
+        root = ET.fromstring(res.content)
+        channels = []
+        for channel in root.findall('channel'):
+            c_id = channel.get('id')
+            c_name = ""
+            display_name = channel.find('display-name')
+            if display_name is not None and display_name.text:
+                c_name = display_name.text
+            else:
+                c_name = c_id
+                
+            c_logo = ""
+            icon = channel.find('icon')
+            if icon is not None and icon.get('src'):
+                c_logo = icon.get('src')
+            
+            channels.append({"id": c_id, "name": c_name, "logo": c_logo})
+            
+        return channels
+    except Exception as e:
+        logging.error(f"Error fetching EPG: {e}")
+        return []
+
 def fetch_source_job(source_id):
     config = load_config()
     source = next((s for s in config["sources"] if s["id"] == source_id), None)
@@ -151,12 +204,26 @@ def fetch_source_job(source_id):
     url = source["url"]
     src_type = source["type"]
     
-    if src_type == 'm3u':
-        raw = parse_m3u_raw(url)
-    else:
-        raw = scrape_url_raw(url)
+    if src_type == 'epg':
+        raw = parse_epg_raw(url)
+        epg_sources_db[source_id] = raw
         
-    raw_sources_db[source_id] = raw
+        # Merge all epg sources
+        global epg_channels
+        merged_epg = []
+        for k, v in epg_sources_db.items():
+            merged_epg.extend(v)
+        epg_channels = sorted(merged_epg, key=lambda x: x['name'])
+        logging.info(f"Merged {len(epg_channels)} total EPG channels")
+    else:
+        if src_type == 'm3u':
+            raw = parse_m3u_raw(url)
+        elif src_type == 'json':
+            raw = parse_json_raw(url)
+        else:
+            raw = scrape_url_raw(url)
+            
+        raw_sources_db[source_id] = raw
     
     # Update status
     source["last_run"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -176,6 +243,8 @@ def rebuild_channels_db():
             title = item['title']
             ace_id = item['ace_id']
             extinf = item.get('extinf')
+            provided_tvg_id = item.get('provided_tvg_id')
+            provided_logo = item.get('provided_logo')
             
             base_title = title.rstrip('* ').strip()
             
@@ -186,10 +255,15 @@ def rebuild_channels_db():
             base_title = re.sub(r'(?i)\s+(1080p|720p|4k|hd|fhd|sd|hevc|h265|x265)\s*$', '', base_title).strip()
             
             if base_title not in grouped:
-                grouped[base_title] = {"ace_ids": [], "extinf": extinf, "title": base_title}
+                grouped[base_title] = {"ace_ids": [], "extinf": extinf, "title": base_title, "provided_tvg_id": provided_tvg_id, "provided_logo": provided_logo}
+                
             grouped[base_title]["ace_ids"].append(ace_id)
             if not grouped[base_title]["extinf"] and extinf:
                 grouped[base_title]["extinf"] = extinf # keep best extinf
+            if provided_tvg_id and not grouped[base_title].get("provided_tvg_id"):
+                grouped[base_title]["provided_tvg_id"] = provided_tvg_id
+            if provided_logo and not grouped[base_title].get("provided_logo"):
+                grouped[base_title]["provided_logo"] = provided_logo
             
     channels = []
     used_chnos = set()
@@ -201,6 +275,8 @@ def rebuild_channels_db():
         used_chnos.add(chno)
         
         epg_id = mappings.get(chno, "")
+        if not epg_id and data.get("provided_tvg_id"):
+            epg_id = data["provided_tvg_id"]
         
         channels.append({
             "GuideNumber": chno,
@@ -208,7 +284,8 @@ def rebuild_channels_db():
             "URL": f"/auto/v{chno}",
             "ace_ids": list(set(data["ace_ids"])),
             "extinf": data["extinf"],
-            "mapped_epg_id": epg_id
+            "mapped_epg_id": epg_id,
+            "mapped_epg_logo": data.get("provided_logo", "")
         })
         
     channels.sort(key=lambda x: x["GuideName"])
@@ -216,54 +293,37 @@ def rebuild_channels_db():
     # Auto-mapping logic
     def clean_string(s):
         s = s.lower()
-        s = re.sub(r'[^a-z0-9]', '', s)
-        s = re.sub(r'(hd|fhd|4k|1080p|720p)', '', s)
-        return s
+        s = re.sub(r'[^a-z0-9]', ' ', s)
+        s = re.sub(r'\b(hd|fhd|4k|1080p|720p)\b', '', s)
+        return s.strip()
         
-    for c in channels:
-        if not c["mapped_epg_id"] and epg_channels:
-            c_clean = clean_string(c["GuideName"])
-            for e in epg_channels:
-                e_clean = clean_string(e["name"])
-                if c_clean == e_clean or (c_clean and e_clean and c_clean in e_clean):
-                    c["mapped_epg_id"] = e["id"]
-                    config["mappings"][c["GuideNumber"]] = e["id"]
-                    break
+    if epg_channels:
+        epg_names = {clean_string(e["name"]): e["id"] for e in epg_channels}
+        epg_names_list = list(epg_names.keys())
+        
+        for c in channels:
+            if not c["mapped_epg_id"]:
+                c_clean = clean_string(c["GuideName"])
+                if not c_clean:
+                    continue
+                # Use fuzzywuzzy to find the best match
+                match, score = process.extractOne(c_clean, epg_names_list, scorer=fuzz.token_set_ratio)
+                # If score is > 85%, we consider it a match
+                if score >= 85:
+                    mapped_id = epg_names[match]
+                    c["mapped_epg_id"] = mapped_id
+                    config["mappings"][c["GuideNumber"]] = mapped_id
+                    
+            if c["mapped_epg_id"]:
+                if not c.get("mapped_epg_logo"):
+                    c["mapped_epg_logo"] = next((e["logo"] for e in epg_channels if e["id"] == c["mapped_epg_id"]), "")
                     
     save_config(config)
     
     channels_db = channels
     logging.info(f"Rebuilt channels_db: {len(channels_db)} unique channels.")
 
-def refresh_epg():
-    global epg_channels
-    config = load_config()
-    url = config.get("epg_url")
-    if not url:
-        epg_channels = []
-        return
-        
-    try:
-        logging.info(f"Fetching EPG from {url}")
-        res = requests.get(url, timeout=15)
-        root = ET.fromstring(res.content)
-        channels = []
-        for channel in root.findall('channel'):
-            c_id = channel.get('id')
-            c_name = ""
-            display_name = channel.find('display-name')
-            if display_name is not None and display_name.text:
-                c_name = display_name.text
-            else:
-                c_name = c_id
-            
-            channels.append({"id": c_id, "name": c_name})
-            
-        epg_channels = sorted(channels, key=lambda x: x['name'])
-        logging.info(f"Loaded {len(epg_channels)} EPG channels")
-    except Exception as e:
-        logging.error(f"Error fetching EPG: {e}")
-        epg_channels = []
+
 
 def init_scheduler():
     scheduler.remove_all_jobs()
@@ -372,18 +432,7 @@ def save_mappings():
     rebuild_channels_db()
     return jsonify({"status": "success"})
 
-@app.route('/settings', methods=['GET', 'POST'])
-def settings():
-    config = load_config()
-    if request.method == 'POST':
-        epg_url = request.form.get("epg_url", "")
-        config["epg_url"] = epg_url
-        save_config(config)
-        refresh_epg()
-        rebuild_channels_db()
-        return redirect(url_for('settings'))
-        
-    return render_template('settings.html', config=config, epg_channels_count=len(epg_channels))
+
 
 @app.route('/playlist.m3u')
 def playlist():
@@ -392,13 +441,19 @@ def playlist():
         extinf = c.get("extinf", "")
         
         if c.get("mapped_epg_id"):
+            logo_str = f' tvg-logo="{c.get("mapped_epg_logo", "")}"' if c.get("mapped_epg_logo") else ""
             if extinf:
                 if 'tvg-id="' in extinf:
                     extinf = re.sub(r'tvg-id="[^"]*"', f'tvg-id="{c["mapped_epg_id"]}"', extinf)
                 else:
                     extinf = extinf.replace('#EXTINF:-1', f'#EXTINF:-1 tvg-id="{c["mapped_epg_id"]}"')
+                
+                if 'tvg-logo="' in extinf and c.get("mapped_epg_logo"):
+                    extinf = re.sub(r'tvg-logo="[^"]*"', f'tvg-logo="{c["mapped_epg_logo"]}"', extinf)
+                elif c.get("mapped_epg_logo"):
+                    extinf = extinf.replace('#EXTINF:-1', f'#EXTINF:-1{logo_str}')
             else:
-                extinf = f'#EXTINF:-1 tvg-id="{c["mapped_epg_id"]}" tvg-chno="{c["GuideNumber"]}", {c["GuideName"]}'
+                extinf = f'#EXTINF:-1 tvg-id="{c["mapped_epg_id"]}"{logo_str} tvg-chno="{c["GuideNumber"]}", {c["GuideName"]}'
         else:
             if not extinf:
                 extinf = f'#EXTINF:-1 tvg-chno="{c["GuideNumber"]}", {c["GuideName"]}'
@@ -431,6 +486,5 @@ def stream(channel_id):
     return "All stream sources failed", 502
 
 if __name__ == '__main__':
-    refresh_epg()
     init_scheduler()
     app.run(host='0.0.0.0', port=5004)

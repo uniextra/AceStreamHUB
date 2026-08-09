@@ -178,27 +178,34 @@
             background: var(--danger);
         }
 
-        /* Tables - macOS list style */
-        table {
+        /* Modern Grid Tables */
+        .grid-table {
             width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
+            display: flex;
+            flex-direction: column;
         }
-        th, td {
-            text-align: left;
-            padding: 1rem 0.5rem;
-            border-bottom: 0.5px solid rgba(255,255,255,0.1);
-            font-size: 0.95rem;
+        .grid-header, .grid-row {
+            display: grid;
+            grid-template-columns: var(--grid-cols, 1fr 1fr 1fr);
+            gap: 1rem;
+            padding: 0.8rem 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            align-items: center;
         }
-        th {
+        .grid-header {
             color: var(--text-muted);
             font-weight: 500;
             font-size: 0.85rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        tr:last-child td {
+        .grid-row:last-child {
             border-bottom: none;
+        }
+        .grid-row select {
+            padding: 0.4rem 0.5rem;
+            margin-bottom: 0;
+            font-size: 0.85rem;
         }
     </style>
     {% block head %}{% endblock %}
@@ -212,7 +219,6 @@
         <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.path == '/dashboard' %}active{% endif %}">Dashboard</a>
         <a href="{{ url_for('sources') }}" class="nav-link {% if request.path == '/sources' %}active{% endif %}">Sources</a>
         <a href="{{ url_for('channels_view') }}" class="nav-link {% if request.path == '/channels' %}active{% endif %}">Channels & EPG</a>
-        <a href="{{ url_for('settings') }}" class="nav-link {% if request.path == '/settings' %}active{% endif %}">Settings</a>
     </div>
 
     <div class="main-content">

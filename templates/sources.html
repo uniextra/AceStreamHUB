@@ -13,8 +13,10 @@
         <div>
             <label>Source Type</label>
             <select id="src_type">
-                <option value="m3u">M3U Playlist URL</option>
-                <option value="scrape">Web Scrape URL</option>
+                <option value="m3u" style="color: #0A84FF; font-weight: 600;">M3U Playlist URL</option>
+                <option value="json" style="color: #5E5CE6; font-weight: 600;">JSON API URL</option>
+                <option value="scrape" style="color: #FF9F0A; font-weight: 600;">Web Scrape URL</option>
+                <option value="epg" style="color: #30D158; font-weight: 600;">XMLTV EPG URL</option>
             </select>
         </div>
         <div style="grid-column: 1 / -1;">
@@ -38,37 +40,42 @@
 
 <div class="card">
     <h2>Active Sources</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Interval</th>
-                <th>Status</th>
-                <th>Last Run</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
+    <div class="grid-table" style="--grid-cols: 2fr 1fr 1fr 1fr 1.5fr 1fr;">
+        <div class="grid-header">
+            <div>Name</div>
+            <div>Type</div>
+            <div>Interval</div>
+            <div>Status</div>
+            <div>Last Run</div>
+            <div>Actions</div>
+        </div>
+        <div id="sources-table">
+            {% set type_colors = {
+                'm3u': {'bg': 'rgba(10, 132, 255, 0.2)', 'text': '#0A84FF'},
+                'json': {'bg': 'rgba(94, 92, 230, 0.2)', 'text': '#5E5CE6'},
+                'epg': {'bg': 'rgba(48, 209, 88, 0.2)', 'text': '#30D158'},
+                'scrape': {'bg': 'rgba(255, 159, 10, 0.2)', 'text': '#FF9F0A'}
+            } %}
             {% for src in sources %}
-            <tr>
-                <td>{{ src.name }}</td>
-                <td><span style="background: rgba(59,130,246,0.2); padding: 2px 8px; border-radius: 4px; color: var(--primary);">{{ src.type | upper }}</span></td>
-                <td>Every {{ (src.interval_minutes / 60)|int }}h</td>
-                <td>{{ src.status }}</td>
-                <td>{{ src.last_run or 'Never' }}</td>
-                <td>
-                    <button class="btn" style="padding: 0.4rem 0.8rem;" onclick="refreshSource('{{ src.id }}')">Sync</button>
-                    <button class="btn btn-danger" style="padding: 0.4rem 0.8rem;" onclick="deleteSource('{{ src.id }}')">Del</button>
-                </td>
-            </tr>
+            {% set tcolor = type_colors.get(src.type, {'bg': 'rgba(59,130,246,0.2)', 'text': '#3b82f6'}) %}
+            <div class="grid-row">
+                <div style="font-weight: 500;">{{ src.name }}</div>
+                <div><span style="background: {{ tcolor.bg }}; padding: 2px 8px; border-radius: 4px; color: {{ tcolor.text }}; font-size: 0.8rem; font-weight: 600;">{{ src.type | upper }}</span></div>
+                <div style="color: var(--text-muted);">Every {{ (src.interval_minutes / 60)|int }}h</div>
+                <div style="color: var(--text-muted);">{{ src.status }}</div>
+                <div style="color: var(--text-muted); font-size: 0.85rem;">{{ src.last_run or 'Never' }}</div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;" onclick="refreshSource('{{ src.id }}')">Sync</button>
+                    <button class="btn btn-danger" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;" onclick="deleteSource('{{ src.id }}')">Del</button>
+                </div>
+            </div>
             {% else %}
-            <tr>
-                <td colspan="6" style="text-align: center; color: var(--text-muted);">No sources configured yet.</td>
-            </tr>
+            <div class="grid-row" style="grid-template-columns: 1fr; justify-content: center;">
+                <div style="text-align: center; color: var(--text-muted);">No sources configured yet.</div>
+            </div>
             {% endfor %}
-        </tbody>
-    </table>
+        </div>
+    </div>
 </div>
 
 <script>
