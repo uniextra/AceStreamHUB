@@ -44,8 +44,9 @@
 
 <script>
 function copyUrl() {
-    const url = document.getElementById('playlistUrl').innerText;
-    navigator.clipboard.writeText(url).then(() => {
+    const url = document.getElementById('playlistUrl').innerText.trim();
+    
+    const showSuccess = () => {
         const copyIcon = document.getElementById('copyIcon');
         const checkIcon = document.getElementById('checkIcon');
         copyIcon.style.display = 'none';
@@ -54,7 +55,35 @@ function copyUrl() {
             copyIcon.style.display = 'block';
             checkIcon.style.display = 'none';
         }, 2000);
-    });
+    };
+
+    const fallbackCopy = (text) => {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            showSuccess();
+        } catch (err) {
+            console.error('Fallback: unable to copy', err);
+        }
+        document.body.removeChild(textArea);
+    };
+
+    if (!navigator.clipboard) {
+        fallbackCopy(url);
+    } else {
+        navigator.clipboard.writeText(url).then(() => {
+            showSuccess();
+        }).catch(err => {
+            fallbackCopy(url);
+        });
+    }
 }
 </script>
 </div>
