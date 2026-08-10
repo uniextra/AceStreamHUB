@@ -507,13 +507,17 @@ def test_channel(chno):
         return jsonify({"error": "No IDs found"}), 404
         
     best_id = None
-    best_time = float('inf')
+    best_score = -float('inf')
     results = []
     
     for aid in ace_ids:
         start = time.time()
         success = False
         info = ""
+        res_label = "SD"
+        peers = 0
+        speed_kbps = 0
+        
         try:
             # We bypass acexy to get the raw JSON response from the AceStream engine
             engine_url = "http://acestream-engine:6878"
@@ -531,8 +535,6 @@ def test_channel(chno):
                         
                         # 1. Get peers and speed from stat_url
                         stat_r = requests.get(stat_url, timeout=5)
-                        peers = 0
-                        speed_kbps = 0
                         if stat_r.status_code == 200:
                             stat_data = stat_r.json()
                             if "response" in stat_data and stat_data["response"]:
@@ -544,7 +546,6 @@ def test_channel(chno):
                         br_label = f"{br_mbps:.1f} Mbps"
                         
                         # 2. Use ffprobe to get resolution
-                        res_label = "SD"
                         cmd = [
                             'ffprobe',
                             '-v', 'quiet',
@@ -574,9 +575,20 @@ def test_channel(chno):
             logging.error(f"Test error for {aid}: {e}")
             
         elapsed = time.time() - start
+        
+        score = -float('inf')
+        if success:
+            score = 0
+            if res_label == "FHD":
+                score += 1000
+            elif res_label == "HD":
+                score += 500
+            score += peers
+            score -= (elapsed * 5) # Penalty for slow response
+            
         results.append({"id": aid, "success": success, "time": elapsed, "info": info})
-        if success and elapsed < best_time:
-            best_time = elapsed
+        if success and score > best_score:
+            best_score = score
             best_id = aid
             
     if best_id:
