@@ -65,9 +65,9 @@
                 </div>
                 <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px;">
                     {% for aid in c.ace_ids %}
-                    <li style="display: flex; align-items: center; justify-content: space-between; font-family: monospace; font-size: 0.85rem; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; {% if c.preferred_id == aid %}border: 1px solid var(--primary);{% else %}border: 1px solid transparent;{% endif %}">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            {% if c.preferred_id == aid %}<span style="background: rgba(10,132,255,0.2); color: var(--primary); font-weight: bold; font-size: 0.7rem; text-transform: uppercase; padding: 2px 6px; border-radius: 4px;">Primary</span>{% endif %}
+                    <li id="li-{{ c.GuideNumber }}-{{ aid }}" style="display: flex; align-items: center; justify-content: space-between; font-family: monospace; font-size: 0.85rem; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; {% if c.preferred_id == aid %}border: 1px solid var(--primary);{% else %}border: 1px solid transparent;{% endif %}">
+                        <div class="badge-container" style="display: flex; align-items: center; gap: 10px;">
+                            {% if c.preferred_id == aid %}<span class="primary-badge" style="background: rgba(10,132,255,0.2); color: var(--primary); font-weight: bold; font-size: 0.7rem; text-transform: uppercase; padding: 2px 6px; border-radius: 4px;">Primary</span>{% endif %}
                             <span>{{ aid }}</span>
                         </div>
                         <div id="res-{{ c.GuideNumber }}-{{ aid }}" style="font-size: 0.8rem; font-weight: bold;"></div>
@@ -123,7 +123,22 @@ async function testChannel(chno) {
 
         if (data.success) {
             btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Complete`;
-            setTimeout(() => { window.location.reload(); }, 1500);
+            
+            // Remove old primary badges
+            document.querySelectorAll(`#details-${chno} .primary-badge`).forEach(el => el.remove());
+            document.querySelectorAll(`#details-${chno} li`).forEach(li => li.style.border = '1px solid transparent');
+            
+            // Add new primary badge
+            const bestLi = document.getElementById(`li-${chno}-${data.best_id}`);
+            if (bestLi) {
+                bestLi.style.border = '1px solid var(--primary)';
+                const badgeContainer = bestLi.querySelector('.badge-container');
+                if (badgeContainer) {
+                    badgeContainer.insertAdjacentHTML('afterbegin', `<span class="primary-badge" style="background: rgba(10,132,255,0.2); color: var(--primary); font-weight: bold; font-size: 0.7rem; text-transform: uppercase; padding: 2px 6px; border-radius: 4px;">Primary</span>`);
+                }
+            }
+            
+            setTimeout(() => { btn.innerHTML = originalContent; btn.disabled = false; }, 3000);
         } else {
             btn.innerHTML = `All Failed`;
             setTimeout(() => { btn.innerHTML = originalContent; btn.disabled = false; }, 3000);
