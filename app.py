@@ -515,53 +515,63 @@ def test_channel(chno):
         success = False
         info = ""
         try:
-            url = f"{os.environ.get('ACESTREAM_URL', 'http://acexy:8080')}/ace/getstream?id={aid}"
-            
-            # 1. Download for 2.5 seconds to accurately measure bitrate
-            dl_start = time.time()
-            downloaded = 0
-            with requests.get(url, stream=True, timeout=15) as r:
-                if r.status_code == 200:
-                    for chunk in r.iter_content(chunk_size=16384):
-                        if chunk:
-                            downloaded += len(chunk)
+            # We bypass acexy to get the raw JSON response from the AceStream engine
+            engine_url = "http://acestream-engine:6878"
+            getstream_url = f"{engine_url}/ace/getstream?id={aid}&format=json"
+            r = requests.get(getstream_url, timeout=10)
+            if r.status_code == 200:
+                data = r.json()
+                if "response" in data and data["response"]:
+                    stat_url = data["response"].get("stat_url")
+                    playback_url = data["response"].get("playback_url")
+                    
+                    if stat_url and playback_url:
+                        # Wait a couple of seconds for the engine to find peers and start buffering
+                        time.sleep(2.5)
+                        
+                        # 1. Get peers and speed from stat_url
+                        stat_r = requests.get(stat_url, timeout=5)
+                        peers = 0
+                        speed_kbps = 0
+                        if stat_r.status_code == 200:
+                            stat_data = stat_r.json()
+                            if "response" in stat_data and stat_data["response"]:
+                                peers = stat_data["response"].get("peers", 0)
+                                speed_kbps = stat_data["response"].get("speed_down", 0)
+                        
+                        # speed_down is typically in KB/s
+                        br_mbps = (speed_kbps * 8) / 1000
+                        br_label = f"{br_mbps:.1f} Mbps"
+                        
+                        # 2. Use ffprobe to get resolution
+                        res_label = "SD"
+                        cmd = [
+                            'ffprobe',
+                            '-v', 'quiet',
+                            '-print_format', 'json',
+                            '-show_streams',
+                            playback_url
+                        ]
+                        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10, text=True)
+                        if res.returncode == 0:
+                            probe_data = json.loads(res.stdout)
+                            streams = probe_data.get('streams', [])
+                            video_stream = next((s for s in streams if s.get('codec_type') == 'video'), None)
+                            if video_stream:
+                                success = True
+                                height = video_stream.get('height', 0)
+                                if height >= 1080:
+                                    res_label = "FHD"
+                                elif height >= 720:
+                                    res_label = "HD"
+                                    
+                        if not success and peers > 0:
+                            # Even if ffprobe fails, if we found peers, consider it successful
                             success = True
-                        if time.time() - dl_start >= 2.5:
-                            break
                             
-            if success:
-                duration = time.time() - dl_start
-                # Only calculate bitrate if we actually downloaded something reasonable
-                if duration > 0 and downloaded > 100000:
-                    br_mbps = (downloaded * 8) / duration / 1000000
-                    br_label = f"{br_mbps:.1f} Mbps"
-                else:
-                    br_label = "? Mbps"
-                
-                res_label = "SD"
-                # 2. Use ffprobe to get resolution
-                cmd = [
-                    'ffprobe',
-                    '-v', 'quiet',
-                    '-print_format', 'json',
-                    '-show_streams',
-                    url
-                ]
-                res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10, text=True)
-                if res.returncode == 0:
-                    data = json.loads(res.stdout)
-                    streams = data.get('streams', [])
-                    video_stream = next((s for s in streams if s.get('codec_type') == 'video'), None)
-                    if video_stream:
-                        height = video_stream.get('height', 0)
-                        if height >= 1080:
-                            res_label = "FHD"
-                        elif height >= 720:
-                            res_label = "HD"
-                            
-                info = f"{res_label} | {br_label}"
-        except Exception:
-            pass
+                        info = f"{res_label} | {br_label} | Peers: {peers}"
+        except Exception as e:
+            logging.error(f"Test error for {aid}: {e}")
             
         elapsed = time.time() - start
         results.append({"id": aid, "success": success, "time": elapsed, "info": info})
