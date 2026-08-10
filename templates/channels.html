@@ -11,7 +11,10 @@
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
         <h2 style="margin: 0;">Map to Guide</h2>
-        <button onclick="saveMappings()">Save All Mappings</button>
+        <div style="display: flex; gap: 10px;">
+            <button id="btn-test-all" onclick="testAllChannels()" style="background: rgba(10, 132, 255, 0.2); color: var(--primary); border: 1px solid var(--primary);">Test All Channels</button>
+            <button onclick="saveMappings()">Save All Mappings</button>
+        </div>
     </div>
     
     <p style="color: var(--text-muted); margin-bottom: 2rem;">
@@ -37,11 +40,9 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <span>{{ c.ace_ids | length }} sources</span>
-                    {% if c.ace_ids | length > 1 %}
                     <span onclick="toggleDetails('{{ c.GuideNumber }}')" style="cursor: pointer; padding: 4px; display: flex; align-items: center; color: var(--primary); background: rgba(10,132,255,0.1); border-radius: 4px;">
                         <svg id="caret-{{ c.GuideNumber }}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s;"><polyline points="9 18 15 12 9 6"></polyline></svg>
                     </span>
-                    {% endif %}
                 </div>
                 <div style="display: flex; align-items: center;">
                     <select class="epg-select" data-channel-id="{{ c.GuideNumber }}">
@@ -54,7 +55,6 @@
                     </select>
                 </div>
             </div>
-            {% if c.ace_ids | length > 1 %}
             <div id="details-{{ c.GuideNumber }}" style="display: none; grid-column: 1 / -1; background: rgba(0,0,0,0.15); flex-direction: column; padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h4 style="margin: 0; color: var(--text-main); font-size: 0.9rem;">Available Sources</h4>
@@ -95,6 +95,56 @@ function toggleDetails(chno) {
     } else {
         details.style.display = 'none';
         caret.style.transform = 'rotate(0deg)';
+    }
+}
+
+let isTestingAll = false;
+let stopTesting = false;
+
+async function testAllChannels() {
+    if (isTestingAll) {
+        stopTesting = true;
+        document.getElementById('btn-test-all').innerText = "Stopping...";
+        return;
+    }
+    
+    isTestingAll = true;
+    stopTesting = false;
+    const btn = document.getElementById('btn-test-all');
+    
+    // Find all channel IDs
+    const selects = document.querySelectorAll('.epg-select');
+    const channels = Array.from(selects).map(s => s.getAttribute('data-channel-id'));
+    
+    for (let i = 0; i < channels.length; i++) {
+        if (stopTesting) break;
+        const chno = channels[i];
+        
+        btn.innerText = `Testing ${i+1} / ${channels.length}... (Click to Stop)`;
+        
+        // Expand details if hidden
+        const detailsEl = document.getElementById('details-' + chno);
+        if (detailsEl && detailsEl.style.display === 'none') {
+            toggleDetails(chno);
+        }
+        
+        // Scroll to the channel
+        const row = document.getElementById('row-' + chno);
+        if (row) {
+            row.scrollIntoView({behavior: "smooth", block: "center"});
+        }
+        
+        // Test and wait
+        await testChannel(chno);
+        
+        // Small delay to let the engine breathe
+        await new Promise(r => setTimeout(r, 1000));
+    }
+    
+    isTestingAll = false;
+    btn.innerText = stopTesting ? "Test All Channels" : "Test Complete!";
+    if (!stopTesting) {
+        setTimeout(() => { btn.innerText = "Test All Channels"; }, 3000);
     }
 }
 
