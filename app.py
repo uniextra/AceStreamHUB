@@ -496,6 +496,8 @@ def stream(channel_id):
 @app.route('/api/test_channel/<chno>', methods=['POST'])
 def test_channel(chno):
     global channels_db
+    import subprocess
+    import json
     channel = next((c for c in channels_db if c["GuideNumber"] == chno), None)
     if not channel:
         return jsonify({"error": "Channel not found"}), 404
@@ -511,18 +513,47 @@ def test_channel(chno):
     for aid in ace_ids:
         start = time.time()
         success = False
+        info = ""
         try:
             url = f"{os.environ.get('ACESTREAM_URL', 'http://acexy:8080')}/ace/getstream?id={aid}"
-            with requests.get(url, stream=True, timeout=15) as r:
-                if r.status_code == 200:
-                    chunk = next(r.iter_content(chunk_size=1), None)
-                    if chunk:
-                        success = True
+            # Use ffprobe to get resolution and bitrate
+            cmd = [
+                'ffprobe',
+                '-v', 'quiet',
+                '-print_format', 'json',
+                '-show_format',
+                '-show_streams',
+                url
+            ]
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20, text=True)
+            if res.returncode == 0:
+                data = json.loads(res.stdout)
+                streams = data.get('streams', [])
+                video_stream = next((s for s in streams if s.get('codec_type') == 'video'), None)
+                if video_stream:
+                    success = True
+                    width = video_stream.get('width', 0)
+                    height = video_stream.get('height', 0)
+                    bitrate = data.get('format', {}).get('bit_rate', '0')
+                    
+                    res_label = "SD"
+                    if height >= 1080:
+                        res_label = "FHD"
+                    elif height >= 720:
+                        res_label = "HD"
+                        
+                    try:
+                        br_mbps = int(bitrate) / 1000000
+                        br_label = f"{br_mbps:.1f} Mbps"
+                    except:
+                        br_label = "? Mbps"
+                        
+                    info = f"{res_label} | {br_label}"
         except Exception:
             pass
             
         elapsed = time.time() - start
-        results.append({"id": aid, "success": success, "time": elapsed})
+        results.append({"id": aid, "success": success, "time": elapsed, "info": info})
         if success and elapsed < best_time:
             best_time = elapsed
             best_id = aid

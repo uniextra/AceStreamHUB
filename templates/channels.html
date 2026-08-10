@@ -113,7 +113,8 @@ async function testChannel(chno) {
             if (el) {
                 if (res.success) {
                     el.style.color = '#34C759';
-                    el.innerText = `Online (${res.time.toFixed(1)}s)`;
+                    const infoStr = res.info ? `${res.info} | Peers: P2P` : `Online (${res.time.toFixed(1)}s)`;
+                    el.innerText = infoStr;
                 } else {
                     el.style.color = '#FF3B30';
                     el.innerText = 'Offline';
