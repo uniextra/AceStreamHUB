@@ -2,6 +2,11 @@
 
 {% block content %}
 <h1>Channels & EPG Mapping</h1>
+<style>
+@keyframes spin {
+    100% { transform: rotate(360deg); }
+}
+</style>
 
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -21,8 +26,16 @@
         </div>
         <div id="mappings-table">
             {% for c in channels %}
-            <div class="grid-row">
+            <div class="grid-row" id="row-{{ c.GuideNumber }}">
                 <div style="font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    {% if c.ace_ids | length > 1 %}
+                    <span onclick="toggleDetails('{{ c.GuideNumber }}')" style="cursor: pointer; padding: 4px; display: flex; align-items: center; color: var(--text-muted);">
+                        <svg id="caret-{{ c.GuideNumber }}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s;"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </span>
+                    {% else %}
+                    <span style="width: 24px;"></span>
+                    {% endif %}
+                    
                     {% if c.mapped_epg_logo %}
                     <img src="{{ c.mapped_epg_logo }}" alt="logo" style="height: 20px; width: 32px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05);">
                     {% else %}
@@ -42,6 +55,28 @@
                     </select>
                 </div>
             </div>
+            {% if c.ace_ids | length > 1 %}
+            <div id="details-{{ c.GuideNumber }}" style="display: none; grid-column: 1 / -1; background: rgba(0,0,0,0.15); flex-direction: column; padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h4 style="margin: 0; color: var(--text-main); font-size: 0.9rem;">Available Sources</h4>
+                    <button id="btn-test-{{ c.GuideNumber }}" onclick="testChannel('{{ c.GuideNumber }}')" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; display: flex; align-items: center; gap: 6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        Test All Sources
+                    </button>
+                </div>
+                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px;">
+                    {% for aid in c.ace_ids %}
+                    <li style="display: flex; align-items: center; justify-content: space-between; font-family: monospace; font-size: 0.85rem; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; {% if c.preferred_id == aid %}border: 1px solid var(--primary);{% else %}border: 1px solid transparent;{% endif %}">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            {% if c.preferred_id == aid %}<span style="background: rgba(10,132,255,0.2); color: var(--primary); font-weight: bold; font-size: 0.7rem; text-transform: uppercase; padding: 2px 6px; border-radius: 4px;">Primary</span>{% endif %}
+                            <span>{{ aid }}</span>
+                        </div>
+                        <div id="res-{{ c.GuideNumber }}-{{ aid }}" style="font-size: 0.8rem; font-weight: bold;"></div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
             {% else %}
             <div class="grid-row" style="justify-content: center; grid-template-columns: 1fr;">
                 <div style="text-align: center; color: var(--text-muted);">No channels discovered yet. Go to Sources and add one!</div>
@@ -52,6 +87,55 @@
 </div>
 
 <script>
+function toggleDetails(chno) {
+    const details = document.getElementById(`details-${chno}`);
+    const caret = document.getElementById(`caret-${chno}`);
+    if (details.style.display === 'none') {
+        details.style.display = 'flex';
+        caret.style.transform = 'rotate(180deg)';
+    } else {
+        details.style.display = 'none';
+        caret.style.transform = 'rotate(0deg)';
+    }
+}
+
+async function testChannel(chno) {
+    const btn = document.getElementById(`btn-test-${chno}`);
+    const originalContent = btn.innerHTML;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg> Testing...`;
+    btn.disabled = true;
+
+    try {
+        const response = await fetch(`/api/test_channel/${chno}`, { method: 'POST' });
+        const data = await response.json();
+        
+        data.results.forEach(res => {
+            const el = document.getElementById(`res-${chno}-${res.id}`);
+            if (el) {
+                if (res.success) {
+                    el.style.color = '#34C759';
+                    el.innerText = `Online (${res.time.toFixed(1)}s)`;
+                } else {
+                    el.style.color = '#FF3B30';
+                    el.innerText = 'Offline';
+                }
+            }
+        });
+
+        if (data.success) {
+            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Complete`;
+            setTimeout(() => { window.location.reload(); }, 1500);
+        } else {
+            btn.innerHTML = `All Failed`;
+            setTimeout(() => { btn.innerHTML = originalContent; btn.disabled = false; }, 3000);
+        }
+    } catch (err) {
+        console.error(err);
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+    }
+}
+
 async function saveMappings() {
     const mappings = {};
     document.querySelectorAll('.epg-select').forEach(select => {

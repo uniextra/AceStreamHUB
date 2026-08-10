@@ -278,14 +278,21 @@ def rebuild_channels_db():
         if not epg_id and data.get("provided_tvg_id"):
             epg_id = data["provided_tvg_id"]
         
+        pref_id = config.get("preferred_ids", {}).get(chno)
+        ace_ids = list(set(data["ace_ids"]))
+        if pref_id and pref_id in ace_ids:
+            ace_ids.remove(pref_id)
+            ace_ids.insert(0, pref_id)
+            
         channels.append({
             "GuideNumber": chno,
             "GuideName": base_title,
             "URL": f"/auto/v{chno}",
-            "ace_ids": list(set(data["ace_ids"])),
+            "ace_ids": ace_ids,
             "extinf": data["extinf"],
             "mapped_epg_id": epg_id,
-            "mapped_epg_logo": data.get("provided_logo", "")
+            "mapped_epg_logo": data.get("provided_logo", ""),
+            "preferred_id": pref_id
         })
         
     channels.sort(key=lambda x: x["GuideName"])
@@ -484,6 +491,51 @@ def stream(channel_id):
             
     logging.error(f"All sources for channel {channel_id} failed!")
     return "All stream sources failed", 502
+
+@app.route('/api/test_channel/<chno>', methods=['POST'])
+def test_channel(chno):
+    global channels_db
+    channel = next((c for c in channels_db if c["GuideNumber"] == chno), None)
+    if not channel:
+        return jsonify({"error": "Channel not found"}), 404
+        
+    ace_ids = channel["ace_ids"]
+    if not ace_ids:
+        return jsonify({"error": "No IDs found"}), 404
+        
+    best_id = None
+    best_time = float('inf')
+    results = []
+    
+    for aid in ace_ids:
+        start = time.time()
+        success = False
+        try:
+            url = f"{os.environ.get('ACESTREAM_URL', 'http://acexy:8080')}/ace/getstream?id={aid}"
+            with requests.get(url, stream=True, timeout=15) as r:
+                if r.status_code == 200:
+                    chunk = next(r.iter_content(chunk_size=1), None)
+                    if chunk:
+                        success = True
+        except Exception:
+            pass
+            
+        elapsed = time.time() - start
+        results.append({"id": aid, "success": success, "time": elapsed})
+        if success and elapsed < best_time:
+            best_time = elapsed
+            best_id = aid
+            
+    if best_id:
+        config = load_config()
+        if "preferred_ids" not in config:
+            config["preferred_ids"] = {}
+        config["preferred_ids"][chno] = best_id
+        save_config(config)
+        rebuild_channels_db()
+        return jsonify({"success": True, "best_id": best_id, "results": results})
+    else:
+        return jsonify({"success": False, "results": results, "error": "No working sources found"})
 
 if __name__ == '__main__':
     init_scheduler()
