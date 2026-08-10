@@ -28,14 +28,6 @@
             {% for c in channels %}
             <div class="grid-row" id="row-{{ c.GuideNumber }}">
                 <div style="font-weight: 600; display: flex; align-items: center; gap: 8px;">
-                    {% if c.ace_ids | length > 1 %}
-                    <span onclick="toggleDetails('{{ c.GuideNumber }}')" style="cursor: pointer; padding: 4px; display: flex; align-items: center; color: var(--text-muted);">
-                        <svg id="caret-{{ c.GuideNumber }}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s;"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                    </span>
-                    {% else %}
-                    <span style="width: 24px;"></span>
-                    {% endif %}
-                    
                     {% if c.mapped_epg_logo %}
                     <img src="{{ c.mapped_epg_logo }}" alt="logo" style="height: 20px; width: 32px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05);">
                     {% else %}
@@ -43,7 +35,14 @@
                     {% endif %}
                     {{ c.GuideName }}
                 </div>
-                <div style="display: flex; align-items: center;">{{ c.ace_ids | length }} sources</div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span>{{ c.ace_ids | length }} sources</span>
+                    {% if c.ace_ids | length > 1 %}
+                    <span onclick="toggleDetails('{{ c.GuideNumber }}')" style="cursor: pointer; padding: 4px; display: flex; align-items: center; color: var(--primary); background: rgba(10,132,255,0.1); border-radius: 4px;">
+                        <svg id="caret-{{ c.GuideNumber }}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s;"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </span>
+                    {% endif %}
+                </div>
                 <div style="display: flex; align-items: center;">
                     <select class="epg-select" data-channel-id="{{ c.GuideNumber }}">
                         <option value="">-- No EPG Mapping --</option>
