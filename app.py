@@ -7,6 +7,7 @@ import hashlib
 import uuid
 import datetime
 import xml.etree.ElementTree as ET
+import time
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request, Response, render_template, redirect, url_for, stream_with_context
 from apscheduler.schedulers.background import BackgroundScheduler
