@@ -8,6 +8,7 @@ import uuid
 import datetime
 import xml.etree.ElementTree as ET
 import time
+import threading
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request, Response, render_template, redirect, url_for, stream_with_context
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -48,9 +49,12 @@ CONFIG_FILE = os.path.join(DATA_DIR, 'config.json')
 raw_sources_db = {} # source_id -> list of channels
 epg_sources_db = {} # source_id -> list of epg_channels
 epg_programmes_db = {} # source_id -> list of programmes
-channels_db = []
-epg_channels = []
-epg_programmes = [] # global list of all programmes
+epg_channels = [] # global list of all mapped channels
+channels_db = [] # final list of unified channels
+
+active_clients_count = 0
+active_clients_lock = threading.Lock()
+
 scheduler = BackgroundScheduler()
 
 def load_config():
@@ -452,13 +456,8 @@ def dashboard():
     config = load_config()
     total_streams = sum(len(c["ace_ids"]) for c in channels_db)
     
-    active_clients = 0
-    try:
-        res = requests.get("http://acexy:8080/ace/status", timeout=1)
-        if res.status_code == 200:
-            active_clients = res.json().get('clients', 0)
-    except:
-        pass
+    with active_clients_lock:
+        active_clients = active_clients_count
         
     return render_template('dashboard.html', 
                           channels=len(channels_db), 
@@ -468,13 +467,8 @@ def dashboard():
 
 @app.route('/api/stats')
 def api_stats():
-    active_clients = 0
-    try:
-        acexy_req = requests.get('http://acexy:8080/api/status', timeout=3)
-        if acexy_req.status_code == 200:
-            active_clients = acexy_req.json().get('clients', 0)
-    except:
-        pass
+    with active_clients_lock:
+        active_clients = active_clients_count
     return jsonify({"active_clients": active_clients})
 
 @app.route('/sources', methods=['GET'])
@@ -931,7 +925,12 @@ def stream(channel_id):
         scheduler.add_job(scan_adjacent_background, args=[channel_id, scan_interval])
         
     def stream_generator():
-        connect_results = {}
+        global active_clients_count
+        with active_clients_lock:
+            active_clients_count += 1
+            
+        try:
+            connect_results = {}
         def background_task():
             if scan_enabled and needs_scan:
                 logging.info(f"Scan on Play triggered for channel {channel_id}")
@@ -1015,9 +1014,15 @@ def stream(channel_id):
                     else:
                         break
                 ffmpeg_proc.terminate()
+        finally:
+            global active_clients_count
+            with active_clients_lock:
+                active_clients_count -= 1
+            req = connect_results.get('req')
+            if req:
+                req.close()
             
     return Response(stream_with_context(stream_generator()), mimetype="video/MP2T")
-
 def perform_channel_scan(chno, limit=None):
     global channels_db
     import subprocess
