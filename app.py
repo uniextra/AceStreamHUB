@@ -463,7 +463,8 @@ def dashboard():
                           channels=len(channels_db), 
                           sources=len(config.get("sources", [])),
                           streams=total_streams,
-                          active_clients=active_clients)
+                          active_clients=active_clients,
+                          settings=config.get("settings", {}))
 
 @app.route('/api/stats')
 def api_stats():
