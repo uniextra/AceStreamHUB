@@ -4,9 +4,9 @@
 
 # AceStream Hub (AceScrapper Proxy)
 
-AceScrapper is a powerful, automated IPTV proxy and M3U generator designed to seamlessly bridge AceStream broadcasts with standard IPTV players (like IPTV Smarters Pro, VLC, etc.).
+AceScrapper is a powerful, automated IPTV proxy and M3U generator designed to seamlessly bridge AceStream broadcasts with standard IPTV players (like IPTV Smarters Pro, VLC, etc.). It supports multiple simultaneous channels and features a built-in HDHomeRun emulator for easy integration with your local media servers.
 
-It features a premium, Apple-inspired Web Dashboard for managing your sources and mappings.
+It provides a modern, Apple-inspired Web Dashboard for managing your sources and mappings.
 
 ## Features
 
@@ -18,7 +18,7 @@ It features a premium, Apple-inspired Web Dashboard for managing your sources an
 - **Smart EPG Mapping & Dummy Events**: Intelligently fuzzy-matches your AceStream channels to official XMLTV EPG IDs. Injects "blank" dummy events for unmapped channels so they don't break your player's guide.
 - **Background Health Checks**: Scans channels and their adjacent streams automatically in the background to ensure high availability.
 - **Auto-Discard Unhealthy Streams**: Detects failing streams and automatically discards them based on customizable timeout settings.
-- **Premium Web Dashboard**: A sleek, frosted-glass UI (following Apple's Human Interface Guidelines) to monitor real-time active streams, manage sources, and map channels.
+- **Web Dashboard**: A sleek, frosted-glass UI (following Apple's Human Interface Guidelines) to monitor real-time active streams, manage sources, and map channels.
 
 ## Requirements
 - **Docker & Docker Compose**: The entire stack is containerized for zero-hassle deployment.
