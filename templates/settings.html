@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block header_title %}{{ _('Ajustes') }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-md">
+    
+    <div class="glass-panel rounded-xl p-lg glow-focus transition-all duration-300">
+        <div class="flex items-start justify-between mb-lg border-b border-white/10 pb-sm">
+            <div>
+                <h3 class="font-headline-md text-headline-md text-on-surface flex items-center">
+                    <span class="material-symbols-outlined mr-xs text-primary">policy</span>
+                    {{ _('Ajustes del Motor') }}
+                </h3>
+                <p class="font-body-md text-on-surface-variant mt-1">{{ _('Opciones y comportamiento general de la aplicación.') }}</p>
+            </div>
+            <button onclick="saveSettings()" class="bg-primary hover:bg-primary-container text-on-primary font-body-md font-bold py-2 px-6 rounded-lg transition-all duration-200 shadow-[0_0_15px_rgba(0,240,255,0.2)] hover:shadow-[0_0_25px_rgba(0,240,255,0.4)] flex items-center gap-2">
+                <span id="saveIcon" class="material-symbols-outlined text-[20px]">save</span>
+                <span id="saveText">{{ _('Guardar Cambios') }}</span>
+            </button>
+        </div>
+        
+        <!-- Language Setting -->
+        <div class="bg-surface-container-low border border-white/5 rounded-xl p-md group hover:border-primary/30 transition-colors mb-4">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h4 class="font-headline-md text-[18px] text-on-surface">{{ _('Idioma de la Interfaz') }}</h4>
+                    <p class="font-body-sm text-on-surface-variant max-w-2xl mt-1">
+                        {{ _('Selecciona el idioma en el que deseas ver la web.') }}
+                    </p>
+                </div>
+                
+                <div class="relative inline-block w-40 shrink-0">
+                    <select id="language_select" class="w-full bg-surface-container border border-outline-variant rounded-lg px-sm py-2 font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors appearance-none">
+                        <option value="es" {% if settings.get('language', 'es') == 'es' %}selected{% endif %}>{{ _('Español') }}</option>
+                        <option value="en" {% if settings.get('language', 'es') == 'en' %}selected{% endif %}>{{ _('English') }}</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scan on Play Setting -->
+        <div class="bg-surface-container-low border border-white/5 rounded-xl p-md group hover:border-primary/30 transition-colors">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h4 class="font-headline-md text-[18px] text-on-surface">{{ _('Scan on Play') }}</h4>
+                    <p class="font-body-sm text-on-surface-variant max-w-2xl mt-1">
+                        {{ _('Al sintonizar un canal desde tu cliente IPTV, el sistema escaneará los sources en segundo plano para encontrar el de mejor calidad si ha pasado más del tiempo especificado.') }}
+                    </p>
+                </div>
+                
+                <!-- Toggle Switch -->
+                <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in shrink-0">
+                    <input type="checkbox" id="scan_on_play_enabled" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out z-10" {% if settings.get('scan_on_play_enabled', False) %}checked{% endif %} />
+                    <label for="scan_on_play_enabled" class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-container-highest cursor-pointer transition-colors duration-200 ease-in-out"></label>
+                </div>
+            </div>
+            <div id="adjacent_scan_container" class="flex items-center justify-between mt-4 p-4 rounded-lg bg-surface-container border border-white/5 transition-opacity duration-300 {% if not settings.get('scan_on_play_enabled', False) %}opacity-50 pointer-events-none{% endif %}">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-primary">swap_vert</span>
+                    <div>
+                        <h4 class="font-body-md text-[16px] text-on-surface">{{ _('Escanear Canales Adyacentes') }}</h4>
+                        <p class="font-body-sm text-[13px] text-on-surface-variant max-w-xl mt-1">
+                            {{ _('Lanza escaneos en segundo plano del canal anterior y siguiente (según tu orden personalizado) para agilizar el zapping.') }}
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in shrink-0">
+                    <input type="checkbox" id="scan_adjacent_enabled" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out z-10" {% if settings.get('scan_adjacent_enabled', False) %}checked{% endif %} />
+                    <label for="scan_adjacent_enabled" class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-container-highest cursor-pointer transition-colors duration-200 ease-in-out"></label>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-md mt-6 pt-4 border-t border-white/5">
+                <div class="space-y-xs">
+                    <label class="font-label-sm text-label-sm text-on-surface-variant block uppercase tracking-wider" for="scan_interval">{{ _('Intervalo de Refresco (minutos)') }}</label>
+                    <input type="number" id="scan_interval" value="{{ settings.get('scan_on_play_interval_minutes', 60) }}" class="w-full bg-surface-container border border-outline-variant rounded-lg px-sm py-2 font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" />
+                    <p class="text-[12px] text-on-surface-variant opacity-80 mt-1">{{ _('Si el canal se escaneó hace menos de este tiempo, se usará el resultado guardado para evitar bloqueos.') }}</p>
+                </div>
+                
+                <div class="flex flex-col justify-center">
+                    <div class="flex items-start gap-2 bg-secondary-container/10 border border-secondary-container/20 p-3 rounded-lg">
+                        <span class="material-symbols-outlined text-secondary-fixed-dim text-[20px] mt-0.5">info</span>
+                        <p class="text-[13px] text-on-surface-variant">
+                            <strong>{{ _('Nota:') }}</strong> {{ _('Se escanearán un máximo de 3 IDs por canal. Los clientes IPTV pueden dar Timeout si el escaneo tarda más de 10-15 segundos.') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- UI Settings Section -->
+        <div class="bg-surface-container border border-white/5 rounded-xl p-md mt-4">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="material-symbols-outlined text-on-surface-variant">palette</span>
+                <h3 class="font-headline-md text-[18px] text-on-surface">{{ _('Interfaz de Usuario') }}</h3>
+            </div>
+            
+            <!-- Placeholder Feature -->
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h4 class="font-body-lg text-on-surface mb-1">{{ _('Pantalla de Carga (Placeholder)') }}</h4>
+                    <p class="font-body-sm text-on-surface-variant max-w-lg">{{ _('Muestra una pantalla de carga dinámica mientras el canal se sintoniza o se escanea para evitar que el reproductor dé error por tiempo de espera.') }}</p>
+                </div>
+                <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in shrink-0">
+                    <input type="checkbox" id="placeholder_enabled" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out z-10" {% if settings.get('placeholder_enabled', True) %}checked{% endif %} />
+                    <label for="placeholder_enabled" class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-container-highest cursor-pointer transition-colors duration-200 ease-in-out"></label>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Advanced Settings Section -->
+        <div class="bg-surface-container border border-white/5 rounded-xl p-md mt-6">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="material-symbols-outlined text-error">build</span>
+                <h3 class="font-headline-md text-[18px] text-on-surface">{{ _('Avanzado (Expertos)') }}</h3>
+            </div>
+            
+            <!-- Stream Timeout -->
+            <div class="flex items-center justify-between py-3 border-b border-white/5">
+                <div>
+                    <h4 class="font-body-lg text-on-surface mb-1">{{ _('Timeout de Origen (segundos)') }}</h4>
+                    <p class="font-body-sm text-on-surface-variant max-w-lg">{{ _('Tiempo máximo a esperar por un origen antes de saltar al siguiente.') }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="number" id="stream_timeout" value="{{ settings.get('stream_timeout', 30) }}" class="w-20 bg-surface-container-low border border-outline-variant rounded-lg px-2 py-1 text-center text-on-surface font-body-md focus:outline-none focus:border-primary">
+                    <span class="text-on-surface-variant text-sm">s</span>
+                </div>
+            </div>
+            
+            <!-- Auto Discard -->
+            <div class="flex items-center justify-between py-3 border-b border-white/5">
+                <div>
+                    <h4 class="font-body-lg text-on-surface mb-1">{{ _('Auto-Descarte de Orígenes') }}</h4>
+                    <p class="font-body-sm text-on-surface-variant max-w-lg">{{ _('Ignorar automáticamente un origen si ha fallado 3 veces consecutivas en las comprobaciones de fondo.') }}</p>
+                </div>
+                <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in shrink-0">
+                    <input type="checkbox" id="auto_discard_enabled" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out z-10" {% if settings.get('auto_discard_enabled', True) %}checked{% endif %} />
+                    <label for="auto_discard_enabled" class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-container-highest cursor-pointer transition-colors duration-200 ease-in-out"></label>
+                </div>
+            </div>
+            
+            <!-- HDHomeRun Emulator -->
+            <div class="flex items-center justify-between py-3 border-b border-white/5">
+                <div>
+                    <h4 class="font-body-lg text-on-surface mb-1">{{ _('Emulador HDHomeRun') }}</h4>
+                    <p class="font-body-sm text-on-surface-variant max-w-lg">{{ _('Habilita la simulación de un sintonizador HDHomeRun en la red local') }}</p>
+                </div>
+                <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in shrink-0">
+                    <input type="checkbox" id="hdhr_enabled" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out z-10" {% if settings.get('hdhr_enabled', False) %}checked{% endif %} />
+                    <label for="hdhr_enabled" class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-container-highest cursor-pointer transition-colors duration-200 ease-in-out"></label>
+                </div>
+            </div>
+            
+            <!-- Live Buffer -->
+            <div class="flex items-center justify-between py-3 border-b border-white/5">
+                <div>
+                    <h4 class="font-body-lg text-on-surface mb-1">{{ _('Live Buffer de AceStream (segundos)') }}</h4>
+                    <p class="font-body-sm text-on-surface-variant max-w-lg">{{ _('Tiempo de video pre-descargado. Mayor valor reduce cortes pero tarda más en iniciar.') }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="number" id="engine_live_buffer" value="{{ settings.get('engine_live_buffer', 10) }}" class="w-20 bg-surface-container-low border border-outline-variant rounded-lg px-2 py-1 text-center text-on-surface font-body-md focus:outline-none focus:border-primary">
+                    <span class="text-on-surface-variant text-sm">s</span>
+                </div>
+            </div>
+            
+            <!-- Disk Cache Limit -->
+            <div class="flex items-center justify-between py-3">
+                <div>
+                    <h4 class="font-body-lg text-on-surface mb-1">{{ _('Límite Caché de Disco (GB)') }}</h4>
+                    <p class="font-body-sm text-on-surface-variant max-w-lg">{{ _('Límite de espacio en disco que AceStream puede usar. Pon 0 para ilimitado.') }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="number" id="engine_disk_cache" value="{{ settings.get('engine_disk_cache', 0) }}" class="w-20 bg-surface-container-low border border-outline-variant rounded-lg px-2 py-1 text-center text-on-surface font-body-md focus:outline-none focus:border-primary">
+                    <span class="text-on-surface-variant text-sm">GB</span>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('scan_on_play_enabled').addEventListener('change', function(e) {
+    const adjacentContainer = document.getElementById('adjacent_scan_container');
+    const adjacentCheckbox = document.getElementById('scan_adjacent_enabled');
+    if (e.target.checked) {
+        adjacentContainer.classList.remove('opacity-50', 'pointer-events-none');
+    } else {
+        adjacentContainer.classList.add('opacity-50', 'pointer-events-none');
+        adjacentCheckbox.checked = false;
+    }
+});
+
+async function saveSettings() {
+    const data = {
+        scan_on_play_enabled: document.getElementById('scan_on_play_enabled').checked,
+        scan_adjacent_enabled: document.getElementById('scan_adjacent_enabled').checked,
+        scan_on_play_interval_minutes: parseInt(document.getElementById('scan_interval').value) || 60,
+        placeholder_enabled: document.getElementById('placeholder_enabled').checked,
+        language: document.getElementById('language_select').value,
+        auto_discard_enabled: document.getElementById('auto_discard_enabled').checked,
+        hdhr_enabled: document.getElementById('hdhr_enabled').checked,
+        stream_timeout: parseInt(document.getElementById('stream_timeout').value) || 30,
+        engine_live_buffer: parseInt(document.getElementById('engine_live_buffer').value) || 10,
+        engine_disk_cache: parseInt(document.getElementById('engine_disk_cache').value) || 0
+    };
+    
+    const btnText = document.getElementById('saveText');
+    const btnIcon = document.getElementById('saveIcon');
+    
+    btnText.innerText = "{{ _('Saving...') }}";
+    btnIcon.innerText = "sync";
+    btnIcon.style.animation = "spin 1s linear infinite";
+    
+    try {
+        await fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        
+        btnText.innerText = "{{ _('Saved!') }}";
+        btnIcon.innerText = "check";
+        btnIcon.style.animation = "none";
+        btnIcon.classList.add("text-green-400");
+        
+        // Reload to apply language
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+    } catch (e) {
+        btnText.innerText = "{{ _('Error') }}";
+        btnIcon.innerText = "error";
+        btnIcon.style.animation = "none";
+    }
+}
+</script>
+{% endblock %}

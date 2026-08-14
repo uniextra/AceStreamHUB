@@ -1,6 +1,10 @@
-# AceScrapper Proxy
+<p align="center">
+  <img src="static/img/logo.jpg" alt="AceStream Hub Logo" width="150" height="150" style="border-radius: 20px;">
+</p>
 
-AceScrapper is a powerful, automated IPTV proxy and M3U generator designed to seamlessly bridge AceStream broadcasts with standard IPTV players (like IPTV Smarters Pro, VLC, etc.). 
+# AceStream Hub (AceScrapper Proxy)
+
+AceScrapper is a powerful, automated IPTV proxy and M3U generator designed to seamlessly bridge AceStream broadcasts with standard IPTV players (like IPTV Smarters Pro, VLC, etc.).
 
 It features a premium, Apple-inspired Web Dashboard for managing your sources and mappings.
 
@@ -41,3 +45,7 @@ It features a premium, Apple-inspired Web Dashboard for managing your sources an
 
 ## Privacy Note
 The `config.json` file generated locally contains your private EPG and Source URLs. It is safely ignored via `.gitignore` and will never be uploaded to this repository.
+
+## Credits & Acknowledgements
+- `vstavrinov/acestream-engine` for the Dockerized AceStream Engine.
+- `javinator9889/acexy` for the AceStream to HTTP proxy engine.

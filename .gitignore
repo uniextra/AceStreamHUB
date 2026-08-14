@@ -14,3 +14,9 @@ config.json
 .vscode/
 .idea/
 .DS_Store
+
+scans.db
+engine_args.txt
+*.txt
+test_*.py
+

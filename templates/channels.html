@@ -1,98 +1,210 @@
 {% extends "base.html" %}
 
-{% block content %}
-<h1>Channels & EPG Mapping</h1>
-<style>
-@keyframes spin {
-    100% { transform: rotate(360deg); }
-}
-</style>
+{% block header_title %}Channels & EPG Mapping{% endblock %}
 
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h2 style="margin: 0;">Map to Guide</h2>
-        <div style="display: flex; gap: 10px;">
-            <button id="btn-test-all" onclick="testAllChannels()" style="background: rgba(10, 132, 255, 0.2); color: var(--primary); border: 1px solid var(--primary);">Test All Channels</button>
-            <button onclick="saveMappings()">Save All Mappings</button>
-        </div>
+{% block header_actions %}
+<div class="flex items-center gap-3">
+    <div class="text-right hidden sm:block">
+        <p class="font-label-sm text-on-surface-variant uppercase tracking-wider mb-0.5">{{ _('Canales Mapeados') }}</p>
+        <p class="font-body-md text-primary font-bold leading-none">{{ channels|selectattr("mapped_epg_id")|list|length }} / {{ channels|length }}</p>
     </div>
-    
-    <p style="color: var(--text-muted); margin-bottom: 2rem;">
-        Map your discovered Acestream channels to an official EPG channel ID. When mapped, the resulting M3U playlist will perfectly sync with IPTV Smarters Pro!
+    <button onclick="openManualModal()" class="flex items-center gap-2 bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/30 px-4 py-2 rounded-lg transition-colors font-label-sm uppercase tracking-wider">
+        <span class="material-symbols-outlined text-[18px]">add</span>
+        <span class="hidden md:inline">{{ _('Canal Manual') }}</span>
+    </button>
+    <button id="btn-test-all" onclick="testAllChannels()" class="flex items-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 px-4 py-2 rounded-lg transition-colors font-label-sm uppercase tracking-wider">
+        <span class="material-symbols-outlined text-[18px]">speed</span>
+        <span id="btn-test-all-text" class="hidden md:inline">{{ _('Testear Todos') }}</span>
+    </button>
+</div>
+{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<style>
+    .sortable-ghost { opacity: 0.4; background-color: rgba(0, 240, 255, 0.1); }
+    .drag-handle { cursor: grab; }
+    .drag-handle:active { cursor: grabbing; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="glass-panel rounded-xl p-md mb-lg">
+    <p class="font-body-md text-on-surface-variant mb-6">
+        {{ _('Map your discovered Acestream channels to an official EPG channel ID. When mapped, the resulting M3U playlist will perfectly sync with IPTV Smarters Pro!') }}
     </p>
 
-    <div class="grid-table" style="--grid-cols: 2fr 1fr 2fr;">
-        <div class="grid-header">
-            <div>Acestream Channel Name</div>
-            <div>Available Streams</div>
-            <div>EPG Channel (Guide Match)</div>
-        </div>
-        <div id="mappings-table">
-            {% for c in channels %}
-            <div class="grid-row" id="row-{{ c.GuideNumber }}">
-                <div style="font-weight: 600; display: flex; align-items: center; gap: 8px;">
+    <!-- Header Row -->
+    <div class="hidden md:grid grid-cols-12 gap-4 px-4 py-2 border-b border-white/10 mb-4 font-label-sm text-on-surface-variant uppercase tracking-wider">
+        <div class="col-span-5">{{ _('Acestream Channel Name') }}</div>
+        <div class="col-span-3 text-center">{{ _('Available Streams') }}</div>
+        <div class="col-span-4">{{ _('EPG Channel (Guide Match)') }}</div>
+    </div>
+
+    <!-- Mappings Table -->
+    <div id="mappings-table" class="space-y-3">
+        {% for c in channels %}
+        <div class="bg-surface-container-low border border-white/5 rounded-lg overflow-hidden group hover:border-white/10 transition-colors" id="row-{{ c.GuideNumber }}">
+            
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center relative z-10">
+                <!-- Channel Name & Drag Handle -->
+                <div class="col-span-1 md:col-span-5 flex items-center gap-3">
+                    <div class="drag-handle text-on-surface-variant hover:text-primary transition-colors pr-2">
+                        <span class="material-symbols-outlined">drag_indicator</span>
+                    </div>
+                    <div class="sequence-number font-display-lg text-[24px] text-surface-variant w-8 text-center font-black">
+                        {{ c.SequenceNumber }}
+                    </div>
                     {% if c.mapped_epg_logo %}
-                    <img src="{{ c.mapped_epg_logo }}" alt="logo" style="height: 20px; width: 32px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05);">
+                    <div class="w-10 h-10 rounded bg-white/5 flex items-center justify-center p-1 border border-white/10 shrink-0">
+                        <img src="{{ c.mapped_epg_logo }}" alt="logo" class="max-w-full max-h-full object-contain">
+                    </div>
                     {% else %}
-                    <div style="height: 20px; width: 32px; background: rgba(255,255,255,0.08); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: var(--text-muted); font-weight: bold;">?</div>
+                    <div class="w-10 h-10 rounded bg-white/5 flex items-center justify-center border border-white/10 shrink-0">
+                        <span class="font-label-sm text-on-surface-variant opacity-50">?</span>
+                    </div>
                     {% endif %}
-                    {{ c.GuideName }}
+                    <span class="font-body-lg font-semibold text-on-surface truncate" title="{{ c.GuideName }}">{{ c.GuideName }}</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span>{{ c.ace_ids | length }} sources</span>
-                    <span onclick="toggleDetails('{{ c.GuideNumber }}')" style="cursor: pointer; padding: 4px; display: flex; align-items: center; color: var(--primary); background: rgba(10,132,255,0.1); border-radius: 4px;">
-                        <svg id="caret-{{ c.GuideNumber }}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s;"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                    </span>
+                
+                <!-- Sources Count -->
+                <div class="col-span-1 md:col-span-3 flex items-center md:justify-center gap-2">
+                    <span class="font-body-md text-on-surface-variant">{{ c.ace_ids | length }} {{ _('sources') }}</span>
+                    <button onclick="toggleDetails('{{ c.GuideNumber }}')" class="p-1 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center justify-center border border-primary/20" title="View Sources">
+                        <span id="caret-{{ c.GuideNumber }}" class="material-symbols-outlined text-[18px] transition-transform duration-300">expand_more</span>
+                    </button>
                 </div>
-                <div style="display: flex; align-items: center;">
-                    <select class="epg-select" data-channel-id="{{ c.GuideNumber }}">
-                        <option value="">-- No EPG Mapping --</option>
+                
+                <!-- EPG Select -->
+                <div class="col-span-1 md:col-span-4">
+                    <select data-channel-id="{{ c.GuideNumber }}" class="epg-select w-full bg-surface-container-highest border border-white/10 text-on-surface font-body-md rounded-lg focus:ring-primary focus:border-primary p-2.5 transition-colors cursor-pointer appearance-none">
+                        <option value="">-- {{ _('No EPG Match') }} --</option>
                         {% for e in epg_channels %}
-                            <option value="{{ e.id }}" {% if c.mapped_epg_id == e.id %}selected{% endif %}>
+                            <option value="{{ e.id }}" class="bg-surface-container-highest" {% if c.mapped_epg_id == e.id %}selected{% endif %}>
                                 {{ e.name }}
                             </option>
                         {% endfor %}
                     </select>
                 </div>
             </div>
-            <div id="details-{{ c.GuideNumber }}" style="display: none; grid-column: 1 / -1; background: rgba(0,0,0,0.15); flex-direction: column; padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h4 style="margin: 0; color: var(--text-main); font-size: 0.9rem;">Available Sources</h4>
-                    <button id="btn-test-{{ c.GuideNumber }}" onclick="testChannel('{{ c.GuideNumber }}')" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; display: flex; align-items: center; gap: 6px;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                        Test All Sources
+
+            <!-- Details Panel -->
+            <div id="details-{{ c.GuideNumber }}" class="hidden bg-background/50 border-t border-white/5 p-4 flex-col gap-4">
+                <div class="flex justify-between items-center">
+                    <h4 class="font-headline-md text-[16px] text-on-surface">{{ _('Orígenes Disponibles') }}</h4>
+                    <button id="btn-test-{{ c.GuideNumber }}" onclick="testChannel('{{ c.GuideNumber }}')" class="flex items-center gap-1 bg-surface-variant hover:bg-surface-bright text-on-surface px-3 py-1.5 rounded-lg border border-outline-variant transition-colors font-label-sm">
+                        <span class="material-symbols-outlined text-[16px]">play_arrow</span>
+                        {{ _('Testear Todos los Orígenes') }}
                     </button>
                 </div>
-                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px;">
-                    {% for aid in c.ace_ids %}
-                    <li id="li-{{ c.GuideNumber }}-{{ aid }}" style="display: flex; align-items: center; justify-content: space-between; font-family: monospace; font-size: 0.85rem; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; {% if c.preferred_id == aid %}border: 1px solid var(--primary);{% else %}border: 1px solid transparent;{% endif %}">
-                        <div class="badge-container" style="display: flex; align-items: center; gap: 10px;">
-                            {% if c.preferred_id == aid %}<span class="primary-badge" style="background: rgba(10,132,255,0.2); color: var(--primary); font-weight: bold; font-size: 0.7rem; text-transform: uppercase; padding: 2px 6px; border-radius: 4px;">Primary</span>{% endif %}
-                            <span>{{ aid }}</span>
-                        </div>
-                        <div id="res-{{ c.GuideNumber }}-{{ aid }}" style="font-size: 0.8rem; font-weight: bold;"></div>
-                    </li>
-                    {% endfor %}
-                </ul>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b border-white/5 text-on-surface-variant font-label-sm uppercase tracking-wider">
+                                <th class="pb-2 font-bold">Ace ID</th>
+                                <th class="pb-2 px-2 font-bold">{{ _('Resolución') }}</th>
+                                <th class="pb-2 px-2 font-bold">{{ _('Peers') }}</th>
+                                <th class="pb-2 px-2 font-bold">{{ _('Velocidad') }}</th>
+                                <th class="pb-2 px-2 font-bold">{{ _('Tiempo de Test') }}</th>
+                                <th class="pb-2 px-2 text-right font-bold">{{ _('Hace') }}</th>
+                                <th class="pb-2 text-right font-bold w-16"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for aid in c.ace_ids %}
+                        {% set s = scan_db.get(aid) %}
+                            <tr id="tr-{{ c.GuideNumber }}-{{ aid }}" class="border-b border-white/5 {% if c.preferred_id == aid %}bg-primary/5{% endif %} hover:bg-surface-container-highest transition-colors">
+                                <td class="py-2 font-mono text-sm text-on-surface">
+                                    <div class="flex items-center gap-2">
+                                        {{ aid[:8] }}...{{ aid[-4:] }}
+                                        <button onclick="copyToClipboard('{{ aid }}', this)" class="text-on-surface-variant hover:text-white" title="{{ _('Copiar ID') }}">
+                                            <span class="material-symbols-outlined text-[14px]">content_copy</span>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="py-2 px-2 text-on-surface-variant font-body-sm">{{ s.info if s and s.info else 'N/A' }}</td>
+                                <td class="py-2 px-2 text-on-surface-variant font-body-sm">{{ s.bitrate if s and s.bitrate else 'N/A' }}</td>
+                                <td id="res-{{ c.GuideNumber }}-{{ aid }}" class="py-2 px-2 text-on-surface-variant font-body-sm">{{ '%.1f'|format(s.time) ~ 's' if s and s.time else 'N/A' }}</td>
+                                <td class="py-2 px-2 text-right text-on-surface-variant font-body-sm">
+                                    {% if s and s.last_updated %}
+                                    {{ s.minutes_ago }} {{ _('minutos') }}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td class="py-2 text-right font-body-sm">
+                                    <div class="flex justify-end gap-2 items-center">
+                                        <button id="star-{{ c.GuideNumber }}-{{ aid }}" onclick="setPrimary('{{ c.GuideNumber }}', '{{ aid }}')" class="{% if c.preferred_id == aid %}text-yellow-400{% else %}text-on-surface-variant{% endif %} hover:text-yellow-400 transition-colors" title="{{ _('Marcar como Primario') }}">
+                                            <span class="material-symbols-outlined text-[18px]">{% if c.preferred_id == aid %}star{% else %}star_border{% endif %}</span>
+                                        </button>
+                                        <button onclick="deleteSourceId('{{ c.GuideNumber }}', '{{ aid }}')" class="text-on-surface-variant hover:text-error transition-colors" title="{{ _('Eliminar ID') }}">
+                                            <span class="material-symbols-outlined text-[18px]">delete</span>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            {% else %}
-            <div class="grid-row" style="justify-content: center; grid-template-columns: 1fr;">
-                <div style="text-align: center; color: var(--text-muted);">No channels discovered yet. Go to Sources and add one!</div>
-            </div>
-            {% endfor %}
+            
         </div>
+        {% else %}
+        <div class="text-center p-8 border border-dashed border-white/10 rounded-xl">
+            <span class="material-symbols-outlined text-4xl text-on-surface-variant mb-2">live_tv</span>
+            <p class="font-body-md text-on-surface-variant">{{ _('No channels discovered yet. Go to Sources and add one!') }}</p>
+        </div>
+        {% endfor %}
     </div>
 </div>
 
+<!-- Manual Channel Modal -->
+<div id="manual-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="bg-surface-container border border-white/10 rounded-xl p-6 max-w-md w-full shadow-2xl mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-headline-md text-on-surface">{{ _('Añadir Canal / Origen Manual') }}</h3>
+            <button onclick="closeManualModal()" class="text-on-surface-variant hover:text-white transition-colors">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1">{{ _('Nombre del Canal') }}</label>
+                <input type="text" id="manual_channel_name" list="channel_names_list" class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:border-primary font-body-md" placeholder="{{ _('Ej: HBO o Canal Nuevo') }}">
+                <datalist id="channel_names_list">
+                    {% for c in channels %}
+                    <option value="{{ c.GuideName }}"></option>
+                    {% endfor %}
+                </datalist>
+                <p class="text-[12px] text-on-surface-variant mt-1">{{ _('Elige un canal existente para añadirle el ID, o escribe uno nuevo.') }}</p>
+            </div>
+            <div>
+                <label class="font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1">Ace ID</label>
+                <input type="text" id="manual_ace_id" class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:border-primary font-body-md font-mono text-sm" placeholder="Ej: 80f30247...">
+            </div>
+            <button onclick="saveManualChannel(this)" class="w-full flex justify-center items-center gap-2 bg-primary hover:bg-primary-hover text-on-primary py-2 rounded-lg font-label-md uppercase tracking-wider transition-colors mt-2">
+                <span class="material-symbols-outlined text-[18px]">save</span>
+                {{ _('Guardar') }}
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
 function toggleDetails(chno) {
     const details = document.getElementById(`details-${chno}`);
     const caret = document.getElementById(`caret-${chno}`);
-    if (details.style.display === 'none') {
-        details.style.display = 'flex';
+    if (details.classList.contains('hidden')) {
+        details.classList.remove('hidden');
+        details.classList.add('flex');
         caret.style.transform = 'rotate(180deg)';
     } else {
-        details.style.display = 'none';
+        details.classList.add('hidden');
+        details.classList.remove('flex');
         caret.style.transform = 'rotate(0deg)';
     }
 }
@@ -103,27 +215,30 @@ let stopTesting = false;
 async function testAllChannels() {
     if (isTestingAll) {
         stopTesting = true;
-        document.getElementById('btn-test-all').innerText = "Stopping...";
+        document.getElementById('btn-test-all-text').innerText = "Stopping...";
         return;
     }
     
     isTestingAll = true;
     stopTesting = false;
-    const btn = document.getElementById('btn-test-all');
+    const btnText = document.getElementById('btn-test-all-text');
+    const icon = document.querySelector('#btn-test-all .material-symbols-outlined');
     
     // Find all channel IDs
     const selects = document.querySelectorAll('.epg-select');
     const channels = Array.from(selects).map(s => s.getAttribute('data-channel-id'));
     
+    icon.style.animation = 'spin 1s linear infinite';
+    
     for (let i = 0; i < channels.length; i++) {
         if (stopTesting) break;
         const chno = channels[i];
         
-        btn.innerText = `Testing ${i+1} / ${channels.length}... (Click to Stop)`;
+        btnText.innerText = `Testing ${i+1} / ${channels.length}...`;
         
         // Expand details if hidden
         const detailsEl = document.getElementById('details-' + chno);
-        if (detailsEl && detailsEl.style.display === 'none') {
+        if (detailsEl && detailsEl.classList.contains('hidden')) {
             toggleDetails(chno);
         }
         
@@ -141,16 +256,17 @@ async function testAllChannels() {
     }
     
     isTestingAll = false;
-    btn.innerText = stopTesting ? "Test All Channels" : "Test Complete!";
+    icon.style.animation = 'none';
+    btnText.innerText = stopTesting ? "Test All Channels" : "Test Complete!";
     if (!stopTesting) {
-        setTimeout(() => { btn.innerText = "Test All Channels"; }, 3000);
+        setTimeout(() => { btnText.innerText = "Test All Channels"; }, 3000);
     }
 }
 
 async function testChannel(chno) {
     const btn = document.getElementById(`btn-test-${chno}`);
     const originalContent = btn.innerHTML;
-    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg> Testing...`;
+    btn.innerHTML = `<span class="material-symbols-outlined text-[16px]" style="animation: spin 1s linear infinite;">sync</span> Testing...`;
     btn.disabled = true;
 
     try {
@@ -165,26 +281,38 @@ async function testChannel(chno) {
                     const infoStr = res.info ? `${res.info}` : `Online (${res.time.toFixed(1)}s)`;
                     el.innerText = infoStr;
                 } else {
-                    el.style.color = '#FF3B30';
+                    el.style.color = '#ffb4ab'; // Stitch error color
                     el.innerText = 'Offline';
+                    const starBtn = document.getElementById(`star-${chno}-${res.id}`);
+                    if (starBtn && !starBtn.parentNode.querySelector('.text-error[title="Error de conexión"]')) {
+                        starBtn.insertAdjacentHTML('afterend', '<span class="material-symbols-outlined text-error text-[16px] ml-1" title="Error de conexión">error</span>');
+                    }
                 }
             }
         });
 
         if (data.success) {
-            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Complete`;
+            btn.innerHTML = `<span class="material-symbols-outlined text-[16px] text-green-400">check</span> Complete`;
             
-            // Remove old primary badges
-            document.querySelectorAll(`#details-${chno} .primary-badge`).forEach(el => el.remove());
-            document.querySelectorAll(`#details-${chno} li`).forEach(li => li.style.border = '1px solid transparent');
+            // Un-star all rows in this channel
+            document.querySelectorAll(`[id^="tr-${chno}-"]`).forEach(tr => {
+                tr.classList.remove('bg-primary/5');
+            });
+            document.querySelectorAll(`[id^="star-${chno}-"]`).forEach(starBtn => {
+                starBtn.querySelector('span').innerText = 'star_border';
+                starBtn.classList.remove('text-yellow-400');
+                starBtn.classList.add('text-on-surface-variant');
+            });
             
-            // Add new primary badge
-            const bestLi = document.getElementById(`li-${chno}-${data.best_id}`);
-            if (bestLi) {
-                bestLi.style.border = '1px solid var(--primary)';
-                const badgeContainer = bestLi.querySelector('.badge-container');
-                if (badgeContainer) {
-                    badgeContainer.insertAdjacentHTML('afterbegin', `<span class="primary-badge" style="background: rgba(10,132,255,0.2); color: var(--primary); font-weight: bold; font-size: 0.7rem; text-transform: uppercase; padding: 2px 6px; border-radius: 4px;">Primary</span>`);
+            // Star the best one
+            if (data.best_id) {
+                const bestTr = document.getElementById(`tr-${chno}-${data.best_id}`);
+                const bestStar = document.getElementById(`star-${chno}-${data.best_id}`);
+                if (bestTr) bestTr.classList.add('bg-primary/5');
+                if (bestStar) {
+                    bestStar.querySelector('span').innerText = 'star';
+                    bestStar.classList.remove('text-on-surface-variant');
+                    bestStar.classList.add('text-yellow-400');
                 }
             }
             
@@ -200,25 +328,106 @@ async function testChannel(chno) {
     }
 }
 
-async function saveMappings() {
-    const mappings = {};
-    document.querySelectorAll('.epg-select').forEach(select => {
-        const val = select.value;
-        const ch_id = select.getAttribute('data-channel-id');
-        mappings[ch_id] = val;
-    });
-    
-    const btn = event.target;
-    btn.innerText = "Saving...";
-    
-    await fetch('/api/mappings', {
+
+async function setPrimary(guideNumber, aceId) {
+    await fetch(`/api/channels/${guideNumber}/primary`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(mappings)
+        body: JSON.stringify({ ace_id: aceId })
     });
     
-    btn.innerText = "Saved!";
-    setTimeout(() => { btn.innerText = "Save All Mappings"; }, 2000);
+    // Un-star all rows in this channel
+    document.querySelectorAll(`[id^="tr-${guideNumber}-"]`).forEach(tr => {
+        tr.classList.remove('bg-primary/5');
+    });
+    document.querySelectorAll(`[id^="star-${guideNumber}-"]`).forEach(starBtn => {
+        starBtn.classList.remove('text-yellow-400');
+        starBtn.classList.add('text-on-surface-variant');
+        starBtn.querySelector('span').innerText = 'star_border';
+    });
+    
+    // Star the selected one
+    const bestTr = document.getElementById(`tr-${guideNumber}-${aceId}`);
+    const bestStar = document.getElementById(`star-${guideNumber}-${aceId}`);
+    if (bestTr) bestTr.classList.add('bg-primary/5');
+    if (bestStar) {
+        bestStar.classList.remove('text-on-surface-variant');
+        bestStar.classList.add('text-yellow-400');
+        bestStar.querySelector('span').innerText = 'star';
+    }
+}
+
+async function deleteSourceId(guideNumber, aceId) {
+    if(confirm("{{ _('¿Estás seguro de que quieres eliminar este origen de este canal?') }}")) {
+        await fetch(`/api/channels/${guideNumber}/id/${aceId}`, { method: 'DELETE' });
+        window.location.reload();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-save on dropdown change
+    document.querySelectorAll('.epg-select').forEach(select => {
+        select.addEventListener('change', autoSave);
+    });
+    
+    // Make mappings table sortable
+    var el = document.getElementById('mappings-table');
+    if (el) {
+        var sortable = Sortable.create(el, {
+            handle: '.drag-handle',
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            onEnd: function (evt) {
+                // Reorder channels
+                const rows = document.querySelectorAll('#mappings-table > div');
+                const customOrder = [];
+                rows.forEach(r => {
+                    const chno = r.id.replace('row-', '');
+                    customOrder.push(chno);
+                });
+                
+                fetch('/api/reorder_channels', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ custom_order: customOrder })
+                });
+            }
+        });
+    }
+});
+
+function openManualModal() {
+    document.getElementById('manual-modal').classList.remove('hidden');
+    document.getElementById('manual-modal').classList.add('flex');
+}
+function closeManualModal() {
+    document.getElementById('manual-modal').classList.add('hidden');
+    document.getElementById('manual-modal').classList.remove('flex');
+}
+async function saveManualChannel(btn) {
+    const name = document.getElementById('manual_channel_name').value.trim();
+    const aceId = document.getElementById('manual_ace_id').value.trim();
+    if (!name || !aceId) {
+        alert("Faltan datos");
+        return;
+    }
+    
+    // Validar formato Ace ID (40 caracteres hexadecimales)
+    const hexRegex = /^[a-fA-F0-9]{40}$/;
+    if (!hexRegex.test(aceId)) {
+        alert("El Ace ID no es válido. Debe contener exactamente 40 caracteres hexadecimales.");
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = `<span class="material-symbols-outlined animate-spin text-[18px]">refresh</span> {{ _('Guardando...') }}`;
+    
+    await fetch('/api/channels/manual', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ channel_name: name, ace_id: aceId })
+    });
+    window.location.reload();
 }
 </script>
 {% endblock %}

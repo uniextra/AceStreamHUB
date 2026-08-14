@@ -1,0 +1,121 @@
+translations = {
+    "en": {
+        "Inicio": "Dashboard",
+        "Canales": "Channels",
+        "Guía EPG": "EPG Guide",
+        "Ajustes": "Settings",
+        
+        "Métricas Principales": "Main Metrics",
+        "Canales Mapeados": "Mapped Channels",
+        "Orígenes Activos": "Active Sources",
+        "Streams Totales": "Total Streams",
+        "Clientes Activos": "Active Clients",
+        "Escaneos Recientes": "Recent Scans",
+        "Canal": "Channel",
+        "Resolución": "Resolution",
+        "Peers": "Peers",
+        "Velocidad": "Speed",
+        "Tiempo de Test": "Test Time",
+        "Hace": "Ago",
+        "minutos": "minutes",
+        
+        "Guía EPG (Hoy)": "EPG Guide (Today)",
+        "Programación del día en curso para los canales que has mapeado con éxito.": "Today's programming for your successfully mapped channels.",
+        "No hay programación disponible o el archivo EPG no contiene datos para hoy.": "No programming available or the EPG file has no data for today.",
+        "Aún no has mapeado ningún canal.": "You haven't mapped any channels yet.",
+        "Ve a la pestaña \"Canales\" y asigna un ID EPG a tus canales para ver su programación aquí.": "Go to the \"Channels\" tab and assign an EPG ID to see their programming here.",
+        "En Directo": "Live",
+        
+        "Acciones Rápidas": "Quick Actions",
+        "Usa el menú lateral para gestionar tus orígenes, mapear canales a la EPG y copiar el enlace de tu lista.": "Use the sidebar to manage your sources, map channels to the EPG, and copy your playlist link.",
+        "Copiar Enlace": "Copy Link",
+        
+        "Map your discovered Acestream channels to an official EPG channel ID. When mapped, the resulting M3U playlist will perfectly sync with IPTV Smarters Pro!": "Asocia tus canales Acestream a un ID oficial de EPG. Al mapearlos, la lista M3U resultante se sincronizará perfectamente con aplicaciones como IPTV Smarters Pro.",
+        "Acestream Channel Name": "Nombre de Canal Acestream",
+        "Available Streams": "Streams Disponibles",
+        "EPG Channel (Guide Match)": "Canal EPG (Asociación)",
+        "Save Changes": "Guardar Cambios",
+        "Guardar Cambios": "Save Changes",
+        "Saved!": "Saved!",
+        "Saving...": "Saving...",
+        "No EPG Match": "Sin coincidencia EPG",
+        
+        "Ajustes del Motor": "Engine Settings",
+        "Opciones y comportamiento general de la aplicación.": "General application options and behavior.",
+        "Scan on Play": "Scan on Play",
+        "Al sintonizar un canal desde tu cliente IPTV, el sistema escaneará los sources en segundo plano para encontrar el de mejor calidad si ha pasado más del tiempo especificado.": "When tuning a channel from your IPTV client, the system will scan sources in the background to find the best quality if more than the specified time has passed.",
+        "Escanear Canales Adyacentes": "Scan Adjacent Channels",
+        "Lanza escaneos en segundo plano del canal anterior y siguiente (según tu orden personalizado) para agilizar el zapping.": "Launches background scans of the previous and next channel (according to your custom order) to speed up zapping.",
+        "Intervalo de Refresco (minutos)": "Refresh Interval (minutes)",
+        
+        "Orígenes de Canales": "Channel Sources",
+        "Listas M3U, Scrapers o JSON de donde el sistema extraerá los canales.": "M3U playlists, Scrapers or JSONs where the system will extract channels from.",
+        "Añadir Nuevo Origen": "Add New Source",
+        "Nombre": "Name",
+        "Tipo": "Type",
+        "Frecuencia (min)": "Frequency (min)",
+        "Última Ejecución": "Last Run",
+        "Estado": "Status",
+        "Acciones": "Actions",
+        "Nunca": "Never",
+        "Refrescar": "Refresh",
+        "Eliminar": "Delete",
+        
+        "Idioma de la Interfaz": "Interface Language",
+        "Selecciona el idioma en el que deseas ver la web.": "Select the language in which you want to see the web.",
+        "Nota:": "Note:",
+        "Se escanearán un máximo de 3 IDs por canal. Los clientes IPTV pueden dar Timeout si el escaneo tarda más de 10-15 segundos.": "A maximum of 3 IDs per channel will be scanned. IPTV clients might Timeout if the scan takes more than 10-15 seconds.",
+        
+        "Are you sure you want to delete this source?": "¿Estás seguro de que deseas eliminar este origen?",
+        "Testear Todos": "Test All",
+        "Test All Sources": "Test All Sources",
+        "Available Sources": "Available Sources",
+        "Orígenes Disponibles": "Available Sources",
+        "Testear Todos los Orígenes": "Test All Sources",
+        "sources": "sources",
+        "Programación del día en curso para los canales que has mapeado con éxito.": "Current day programming for successfully mapped channels.",
+        "No hay programación disponible o el archivo EPG no contiene datos para hoy.": "No programming available or the EPG file contains no data for today.",
+        "Aún no has mapeado ningún canal.": "You haven't mapped any channels yet.",
+        "Ve a la pestaña \"Canales (Mapping)\" y asigna un ID EPG a tus canales para ver su programación aquí.": "Go to the 'Channels (Mapping)' tab and assign an EPG ID to your channels to see their programming here.",
+        "En Directo": "Live",
+        "Español": "Español",
+        "English": "English",
+        "Error": "Error",
+        "M3U Playlist URL": "M3U Playlist URL",
+        "JSON API URL": "JSON API URL",
+        "Web Scrape URL": "Web Scrape URL",
+        "XMLTV EPG URL": "XMLTV EPG URL",
+        "OK": "OK",
+        "Cargando...": "Loading...",
+        "ERROR": "ERROR",
+        "Todos los origenes fallaron": "All sources failed",
+        "Pantalla de Carga (Placeholder)": "Loading Screen (Placeholder)",
+        "Muestra una pantalla de carga dinámica mientras el canal se sintoniza o se escanea para evitar que el reproductor dé error por tiempo de espera.": "Shows a dynamic loading screen while the channel is tuning or scanning to prevent player timeouts.",
+        "Guardado": "Saved",
+        "Avanzado (Expertos)": "Advanced (Experts)",
+        "Timeout de Origen (segundos)": "Source Timeout (seconds)",
+        "Tiempo máximo a esperar por un origen antes de saltar al siguiente.": "Maximum time to wait for a source before skipping to the next one.",
+        "Auto-Descarte de Orígenes": "Auto-Discard Sources",
+        "Ignorar automáticamente un origen si ha fallado 3 veces consecutivas en las comprobaciones de fondo.": "Automatically ignore a source if it has failed 3 consecutive times in background checks.",
+        "Live Buffer de AceStream (segundos)": "AceStream Live Buffer (seconds)",
+        "Tiempo de video pre-descargado. Mayor valor reduce cortes pero tarda más en iniciar.": "Pre-downloaded video time. Higher value reduces buffering but takes longer to start.",
+        "Límite Caché de Disco (GB)": "Disk Cache Limit (GB)",
+        "Límite de espacio en disco que AceStream puede usar. Pon 0 para ilimitado.": "Disk space limit that AceStream can use. Set 0 for unlimited.",
+        "Marcar como Primario": "Set as Primary",
+        "Eliminar ID": "Delete ID",
+        "¿Estás seguro de que quieres eliminar este origen de este canal?": "Are you sure you want to remove this source from this channel?",
+        "Guardando...": "Saving...",
+        "No channels discovered yet. Go to Sources and add one!": "No channels discovered yet. Go to Sources and add one!",
+        "No sources configured yet. Add one from the panel.": "No sources configured yet. Add one from the panel."
+    }
+}
+
+def gettext(text, lang='es'):
+    if lang == 'es':
+        return text
+    
+    # We invert the check, if text is in english dictionary, return it. 
+    # If not, return original text.
+    if lang in translations:
+        return translations[lang].get(text, text)
+    return text

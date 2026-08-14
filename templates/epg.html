@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+
+{% block title %}Guía EPG - AceStream Hub{% endblock %}
+{% block header_title %}Guía EPG (Hoy){% endblock %}
+
+{% block content %}
+<div class="glass-panel rounded-xl p-md mb-lg">
+    <p class="font-body-md text-on-surface-variant max-w-2xl">{{ _('Programación del día en curso para los canales que has mapeado con éxito.') }}</p>
+
+    <div class="space-y-4 mt-6">
+        {% for c in channels %}
+        <div class="bg-surface-container-low border border-white/5 rounded-lg overflow-hidden group">
+            <!-- Header (Accordion Toggle) -->
+            <button class="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors text-left focus:outline-none" onclick="toggleAccordion('epg-{{ c.GuideNumber }}', this)">
+                <div class="flex items-center gap-4">
+                    <div class="sequence-number font-display-lg text-[24px] text-surface-variant w-8 text-center font-black">
+                        {{ c.SequenceNumber }}
+                    </div>
+                    {% if c.mapped_epg_logo %}
+                    <div class="w-10 h-10 rounded bg-white/5 flex items-center justify-center p-1 border border-white/10 shrink-0">
+                        <img src="{{ c.mapped_epg_logo }}" alt="logo" class="max-w-full max-h-full object-contain">
+                    </div>
+                    {% else %}
+                    <div class="w-10 h-10 rounded bg-white/5 flex items-center justify-center border border-white/10 shrink-0">
+                        <span class="font-label-sm text-on-surface-variant opacity-50">?</span>
+                    </div>
+                    {% endif %}
+                    <span class="font-body-lg font-semibold text-on-surface truncate">{{ c.GuideName }}</span>
+                </div>
+                <div class="flex items-center gap-3 text-on-surface-variant">
+                    <span class="material-symbols-outlined transition-transform duration-300 chevron">expand_more</span>
+                </div>
+            </button>
+            
+            <!-- Content (Programmes) -->
+            <div id="epg-{{ c.GuideNumber }}" class="hidden border-t border-white/5 bg-surface-container/50">
+                <div class="p-4 space-y-4 max-h-[400px] overflow-y-auto epg-list relative">
+                    {% if c.programmes %}
+                        {% for prog in c.programmes %}
+                        <div class="relative pl-6 py-2 border-l-2 border-white/10 prog-item transition-all" data-start="{{ prog.start_time }}" data-stop="{{ prog.stop_time }}">
+                            <!-- Live Indicator dot -->
+                            <div class="absolute left-[-5px] top-4 w-2 h-2 rounded-full bg-white/20 live-dot transition-colors"></div>
+                            
+                            <div class="flex flex-col md:flex-row md:items-center gap-2">
+                                <div class="font-label-sm text-on-surface-variant shrink-0 time-range tracking-wider">
+                                    --:-- - --:--
+                                </div>
+                                <div class="font-body-md text-on-surface font-semibold title-text tracking-tight">
+                                    {{ prog.title }}
+                                </div>
+                            </div>
+                            {% if prog.desc %}
+                            <p class="font-body-sm text-on-surface-variant/70 text-[13px] mt-1 pr-4">{{ prog.desc }}</p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-6">
+                            <span class="material-symbols-outlined text-4xl text-on-surface-variant mb-2">search_off</span>
+                            <p class="font-body-md text-on-surface-variant">{{ _('No hay programación disponible o el archivo EPG no contiene datos para hoy.') }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% if not channels %}
+        <div class="text-center py-8">
+            <span class="material-symbols-outlined text-[48px] text-white/20 mb-4">search_off</span>
+            <p class="font-body-md text-on-surface-variant font-bold">{{ _('Aún no has mapeado ningún canal.') }}</p>
+            <p class="font-body-sm text-on-surface-variant mt-2">{{ _('Ve a la pestaña "Canales (Mapping)" y asigna un ID EPG a tus canales para ver su programación aquí.') }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleAccordion(id, btn) {
+    const el = document.getElementById(id);
+    const chevron = btn.querySelector('.chevron');
+    if (el.classList.contains('hidden')) {
+        el.classList.remove('hidden');
+        chevron.style.transform = 'rotate(180deg)';
+        scrollToLive(el);
+    } else {
+        el.classList.add('hidden');
+        chevron.style.transform = 'rotate(0deg)';
+    }
+}
+
+function formatTime(timestamp) {
+    const d = new Date(timestamp * 1000);
+    return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+}
+
+function scrollToLive(container) {
+    setTimeout(() => {
+        const liveItem = container.querySelector('.prog-item.is-live') || container.querySelector('.is-live');
+        const list = container.querySelector('.epg-list');
+        if (liveItem && list) {
+            const targetTop = liveItem.offsetTop - (list.clientHeight / 2) + (liveItem.clientHeight / 2);
+            list.scrollTo({
+                top: Math.max(0, targetTop),
+                behavior: 'smooth'
+            });
+        }
+    }, 50);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const now = Date.now() / 1000;
+    
+    document.querySelectorAll('.prog-item').forEach(item => {
+        const start = parseFloat(item.getAttribute('data-start'));
+        const stop = parseFloat(item.getAttribute('data-stop'));
+        
+        item.querySelector('.time-range').innerText = `${formatTime(start)} - ${formatTime(stop)}`;
+        
+        if (now >= start && now <= stop) {
+            item.classList.add('is-live');
+            item.style.borderColor = '#00f0ff';
+            
+            const dot = item.querySelector('.live-dot');
+            dot.style.backgroundColor = '#00f0ff';
+            dot.classList.add('animate-pulse');
+            
+            const title = item.querySelector('.title-text');
+            title.innerHTML = `<span class="bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider mr-2 is-live">{{ _('En Directo') }}</span>` + title.innerHTML;
+        } else if (stop < now) {
+            item.classList.add('opacity-40');
+            item.classList.add('hover:opacity-100');
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -5,6 +5,10 @@ services:
     restart: unless-stopped
     ports:
       - "6878:6878"
+    volumes:
+      - ./engine_args.txt:/srv/ace/engine_args.txt
+    command: >
+      /bin/bash -c "args=$$(cat /srv/ace/engine_args.txt 2>/dev/null || echo ''); mkdir -p /dev/shm/.ACEStream; ./start-engine --client-console --live-cache-type memory $$args"
 
   acexy:
     image: ghcr.io/javinator9889/acexy:0.2.2
@@ -30,6 +34,8 @@ services:
       - ACESTREAM_URL=http://acexy:8080
     volumes:
       - ./config.json:/app/config.json
+      - ./scans.db:/app/scans.db
+      - ./engine_args.txt:/app/engine_args.txt
     depends_on:
       - acestream-engine
       - acexy
