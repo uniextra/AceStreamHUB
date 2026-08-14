@@ -287,7 +287,10 @@ def fetch_source_job(source_id):
     
     # Update status
     source["last_run"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    source["status"] = f"OK ({len(raw)} channels)" if raw else "Error"
+    if src_type == 'epg':
+        source["status"] = f"OK ({len(raw_ch)} channels)" if 'raw_ch' in locals() else "Error"
+    else:
+        source["status"] = f"OK ({len(raw)} channels)" if raw else "Error"
     save_config(config)
     
     rebuild_channels_db()
