@@ -929,8 +929,7 @@ def stream(channel_id):
         with active_clients_lock:
             active_clients_count += 1
             
-        try:
-            connect_results = {}
+        connect_results = {}
         def background_task():
             if scan_enabled and needs_scan:
                 logging.info(f"Scan on Play triggered for channel {channel_id}")
@@ -970,52 +969,52 @@ def stream(channel_id):
         lang = config.get("settings", {}).get("language", "es")
         text_loading = translations.gettext("Cargando...", lang)
         
-        if placeholder_enabled:
-            cmd = [
-                'ffmpeg', '-f', 'lavfi', '-re', '-i', 'color=c=#1b1a2f:s=1280x720:r=25',
-                '-ignore_loop', '0', '-i', 'assets/loading.gif',
-                '-filter_complex', f"[1:v]scale=250:-1[spinner];[0:v][spinner]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2+80[bg];[bg]drawtext=text='AceStream Hub - {text_loading}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=(h-text_h)/2-80",
-                '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-b:v', '500k', '-f', 'mpegts', 'pipe:1'
-            ]
-            ffmpeg_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-            
-            while bg_thread.is_alive():
-                chunk = ffmpeg_proc.stdout.read(65536)
-                if chunk:
-                    yield chunk
-                else:
-                    break
-            try:
-                ffmpeg_proc.terminate()
-                ffmpeg_proc.wait(timeout=1)
-            except:
-                pass
-        else:
-            bg_thread.join()
-            
-        req = connect_results.get('req')
-        if req:
-            yield from req.iter_content(chunk_size=1024 * 1024)
-        else:
-            logging.error(f"All sources for channel {channel_id} failed!")
-            text_error = translations.gettext("ERROR", lang)
-            text_failed = translations.gettext("Todos los origenes fallaron", lang)
+        try:
             if placeholder_enabled:
                 cmd = [
-                    'ffmpeg', '-f', 'lavfi', '-re', '-i', 'color=c=#1b0000:s=1280x720:d=10:r=25',
-                    '-vf', f"drawtext=text='AceStream Hub - {text_error}':fontcolor=#ff6b6b:fontsize=48:x=(w-text_w)/2:y=(h-text_h)/2,drawtext=text='{text_failed}':fontcolor=white:fontsize=32:x=(w-text_w)/2:y=(h-text_h)/2+80",
+                    'ffmpeg', '-f', 'lavfi', '-re', '-i', 'color=c=#1b1a2f:s=1280x720:r=25',
+                    '-ignore_loop', '0', '-i', 'assets/loading.gif',
+                    '-filter_complex', f"[1:v]scale=250:-1[spinner];[0:v][spinner]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2+80[bg];[bg]drawtext=text='AceStream Hub - {text_loading}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=(h-text_h)/2-80",
                     '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-b:v', '500k', '-f', 'mpegts', 'pipe:1'
                 ]
                 ffmpeg_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-                while True:
+                
+                while bg_thread.is_alive():
                     chunk = ffmpeg_proc.stdout.read(65536)
                     if chunk:
                         yield chunk
                     else:
                         break
-                ffmpeg_proc.terminate()
+                try:
+                    ffmpeg_proc.terminate()
+                    ffmpeg_proc.wait(timeout=1)
+                except:
+                    pass
+            else:
+                bg_thread.join()
+                
+            req = connect_results.get('req')
+            if req:
+                yield from req.iter_content(chunk_size=1024 * 1024)
+            else:
+                logging.error(f"All sources for channel {channel_id} failed!")
+                text_error = translations.gettext("ERROR", lang)
+                text_failed = translations.gettext("Todos los origenes fallaron", lang)
+                if placeholder_enabled:
+                    cmd = [
+                        'ffmpeg', '-f', 'lavfi', '-re', '-i', 'color=c=#1b0000:s=1280x720:d=10:r=25',
+                        '-vf', f"drawtext=text='AceStream Hub - {text_error}':fontcolor=#ff6b6b:fontsize=48:x=(w-text_w)/2:y=(h-text_h)/2,drawtext=text='{text_failed}':fontcolor=white:fontsize=32:x=(w-text_w)/2:y=(h-text_h)/2+80",
+                        '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-b:v', '500k', '-f', 'mpegts', 'pipe:1'
+                    ]
+                    ffmpeg_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                    while True:
+                        chunk = ffmpeg_proc.stdout.read(65536)
+                        if chunk:
+                            yield chunk
+                        else:
+                            break
+                    ffmpeg_proc.terminate()
         finally:
-            global active_clients_count
             with active_clients_lock:
                 active_clients_count -= 1
             req = connect_results.get('req')
