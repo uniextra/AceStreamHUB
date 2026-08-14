@@ -41,7 +41,8 @@ def inject_translations():
         
     return dict(_=translate, current_lang=lang)
 
-CONFIG_FILE = 'config.json'
+DATA_DIR = os.environ.get('DATA_DIR', '.')
+CONFIG_FILE = os.path.join(DATA_DIR, 'config.json')
 
 # Global Data structures
 raw_sources_db = {} # source_id -> list of channels
@@ -610,7 +611,7 @@ def save_settings_api():
         if cache > 0:
             args += f" --disk-cache-limit {cache*1073741824}" # convert GB to bytes
             
-        with open('engine_args.txt', 'w') as f:
+        with open(os.path.join(DATA_DIR, 'engine_args.txt'), 'w') as f:
             f.write(args)
     except Exception as e:
         logging.error(f"Failed to write engine_args.txt: {e}")
@@ -1142,4 +1143,5 @@ def test_channel(chno):
 if __name__ == '__main__':
     db.init_db()
     init_scheduler()
-    app.run(host='0.0.0.0', port=5004)
+    web_port = int(os.environ.get('WEB_PORT', 5004))
+    app.run(host='0.0.0.0', port=web_port)

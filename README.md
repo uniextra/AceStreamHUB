@@ -37,9 +37,9 @@ It features a premium, Apple-inspired Web Dashboard for managing your sources an
        ports:
          - "6878:6878"
        volumes:
-         - ./engine_args.txt:/srv/ace/engine_args.txt
+         - ./config:/config
        command: >
-         /bin/bash -c "args=$$(cat /srv/ace/engine_args.txt 2>/dev/null || echo ''); mkdir -p /dev/shm/.ACEStream; ./start-engine --client-console --live-cache-type memory $$args"
+         /bin/bash -c "args=$$(cat /config/engine_args.txt 2>/dev/null || echo ''); mkdir -p /dev/shm/.ACEStream; ./start-engine --client-console --live-cache-type memory $$args"
    
      acexy:
        image: ghcr.io/javinator9889/acexy:0.2.2
@@ -60,13 +60,13 @@ It features a premium, Apple-inspired Web Dashboard for managing your sources an
        container_name: acestream-hdhr-proxy
        restart: unless-stopped
        ports:
-         - "5004:5004"
+         - "${WEB_PORT:-5004}:${WEB_PORT:-5004}"
        environment:
          - ACESTREAM_URL=http://acexy:8080
+         - DATA_DIR=/app/config
+         - WEB_PORT=${WEB_PORT:-5004}
        volumes:
-         - ./config.json:/app/config.json
-         - ./scans.db:/app/scans.db
-         - ./engine_args.txt:/app/engine_args.txt
+         - ./config:/app/config
        depends_on:
          - acestream-engine
          - acexy

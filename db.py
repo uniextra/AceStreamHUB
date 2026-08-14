@@ -3,7 +3,8 @@ import datetime
 import os
 import logging
 
-DB_FILE = 'scans.db'
+DATA_DIR = os.environ.get('DATA_DIR', '.')
+DB_FILE = os.path.join(DATA_DIR, 'scans.db')
 
 def get_connection():
     conn = sqlite3.connect(DB_FILE)
