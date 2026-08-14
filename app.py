@@ -247,20 +247,68 @@ def parse_epg_raw(url):
         logging.error(f"Error fetching EPG: {e}")
         return [], []
 
-def fetch_source_job(source_id):
+def fetch_source_job(source_id, force=False):
     config = load_config()
     source = next((s for s in config["sources"] if s["id"] == source_id), None)
     if not source: return
     
     url = source["url"]
     src_type = source["type"]
+    interval_minutes = int(source.get("interval_minutes", 60))
+    cache_file = os.path.join(DATA_DIR, f"cache_{source_id}.json")
     
+    use_cache = False
+    if not force and "last_run" in source and os.path.exists(cache_file):
+        try:
+            last_run = datetime.datetime.strptime(source["last_run"], "%Y-%m-%d %H:%M:%S")
+            if (datetime.datetime.now() - last_run).total_seconds() / 60 < interval_minutes:
+                use_cache = True
+        except:
+            pass
+            
+    raw = None
+    raw_ch = None
+    raw_prog = None
+    
+    if use_cache:
+        logging.info(f"Loading source {source_id} from cache (not expired)")
+        try:
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cached_data = json.load(f)
+                if src_type == 'epg':
+                    raw_ch = cached_data.get('raw_ch', [])
+                    raw_prog = cached_data.get('raw_prog', [])
+                else:
+                    raw = cached_data.get('raw', [])
+        except Exception as e:
+            logging.error(f"Failed to load cache for {source_id}: {e}")
+            use_cache = False
+            
+    if not use_cache:
+        logging.info(f"Fetching source {source_id} from web")
+        if src_type == 'epg':
+            raw_ch, raw_prog = parse_epg_raw(url)
+        else:
+            if src_type == 'm3u':
+                raw = parse_m3u_raw(url)
+            elif src_type == 'json':
+                raw = parse_json_raw(url)
+            else:
+                raw = scrape_url_raw(url)
+                
+        try:
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                if src_type == 'epg':
+                    json.dump({'raw_ch': raw_ch, 'raw_prog': raw_prog}, f)
+                else:
+                    json.dump({'raw': raw}, f)
+        except Exception as e:
+            logging.error(f"Failed to save cache for {source_id}: {e}")
+
     if src_type == 'epg':
-        raw_ch, raw_prog = parse_epg_raw(url)
-        epg_sources_db[source_id] = raw_ch
-        epg_programmes_db[source_id] = raw_prog
+        epg_sources_db[source_id] = raw_ch or []
+        epg_programmes_db[source_id] = raw_prog or []
         
-        # Merge all epg sources
         global epg_channels
         global epg_programmes
         
@@ -276,22 +324,15 @@ def fetch_source_job(source_id):
         
         logging.info(f"Merged {len(epg_channels)} total EPG channels and {len(epg_programmes)} total programmes")
     else:
-        if src_type == 'm3u':
-            raw = parse_m3u_raw(url)
-        elif src_type == 'json':
-            raw = parse_json_raw(url)
-        else:
-            raw = scrape_url_raw(url)
-            
-        raw_sources_db[source_id] = raw
+        raw_sources_db[source_id] = raw or []
     
-    # Update status
-    source["last_run"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    if src_type == 'epg':
-        source["status"] = f"OK ({len(raw_ch)} channels)" if 'raw_ch' in locals() else "Error"
-    else:
-        source["status"] = f"OK ({len(raw)} channels)" if raw else "Error"
-    save_config(config)
+    if not use_cache:
+        source["last_run"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if src_type == 'epg':
+            source["status"] = f"OK ({len(raw_ch or [])} channels)" if raw_ch is not None else "Error"
+        else:
+            source["status"] = f"OK ({len(raw or [])} channels)" if raw is not None else "Error"
+        save_config(config)
     
     rebuild_channels_db()
 
@@ -440,7 +481,7 @@ def init_scheduler():
         )
         # trigger immediately and synchronously on boot so DB is populated
         try:
-            fetch_source_job(src["id"])
+            fetch_source_job(src["id"], force=False)
         except Exception as e:
             logging.error(f"Error fetching source {src['id']} on boot: {e}")
         
