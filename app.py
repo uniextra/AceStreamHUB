@@ -1064,24 +1064,17 @@ def stream(channel_id):
                     valid_ace_ids = filtered_ids
                     
             for ace_id in valid_ace_ids:
-                engine_url = f"http://acestream-engine:6878/ace/getstream?id={ace_id}&format=json"
-                logging.info(f"Attempting to proxy channel {channel_id} natively from engine API with timeout {timeout}s")
+                stream_url = f"http://acexy:8000/pid/{ace_id}/stream.mp4"
+                logging.info(f"Attempting to proxy channel {channel_id} from {stream_url} with timeout {timeout}s")
                 try:
-                    r = requests.get(engine_url, timeout=10)
-                    if r.status_code == 200:
-                        data = r.json()
-                        if "response" in data and data["response"]:
-                            playback_url = data["response"].get("playback_url")
-                            if playback_url:
-                                logging.info(f"Connecting to playback URL: {playback_url}")
-                                req = requests.get(playback_url, stream=True, timeout=timeout)
-                                if req.status_code == 200:
-                                    connect_results['req'] = req
-                                    return
-                                else:
-                                    logging.warning(f"Fallback: playback URL returned {req.status_code}")
+                    req = requests.get(stream_url, stream=True, timeout=timeout)
+                    if req.status_code == 200:
+                        connect_results['req'] = req
+                        return
+                    else:
+                        logging.warning(f"Fallback: {stream_url} returned {req.status_code}")
                 except Exception as e:
-                    logging.error(f"Fallback: failed to connect to engine API for {ace_id}: {e}")
+                    logging.error(f"Fallback: failed to connect to {stream_url}: {e}")
                     continue
             connect_results['req'] = None
 
@@ -1194,6 +1187,9 @@ def perform_channel_scan(chno, limit=None):
                         
                         br_mbps = (speed_kbps * 8) / 1000
                         br_label = f"{br_mbps:.1f} Mbps"
+                        
+                        # Reemplazamos la URL de reproducción por la de nuestro proxy local acexy
+                        playback_url = f"http://acexy:8000/pid/{aid}/stream.mp4"
                         
                         cmd = [
                             'ffprobe',

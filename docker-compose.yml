@@ -1,17 +1,30 @@
 services:
   acestream-engine:
-    image: jopsis/aceserve:latest
+    image: vstavrinov/acestream-engine:latest
     container_name: acestream-engine
     restart: unless-stopped
     ports:
       - "6878:6878"
       - "8621:8621"
-      - "62062:62062"
-    dns:
-      - 1.1.1.1
-      - 1.0.0.1
-    volumes:
-      - ./config:/config
+    command: >
+      --core-skip-version-check
+      --log-debug 1
+      --live-cache-type memory
+      --live-buffer 20
+      --vod-buffer 10
+
+  acexy:
+    image: javinator9889/acexy:latest
+    container_name: acexy
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ACESTREAM_HOST=acestream-engine
+      - ACESTREAM_PORT=6878
+      - ACEPROXY_PORT=8000
+    depends_on:
+      - acestream-engine
 
   proxy-app:
     build: .
@@ -20,10 +33,10 @@ services:
     ports:
       - "${WEB_PORT:-5004}:${WEB_PORT:-5004}"
     environment:
-      - ACESTREAM_URL=http://127.0.0.1:8888
+      - ACESTREAM_URL=http://acexy:8000
       - DATA_DIR=/app/config
       - WEB_PORT=${WEB_PORT:-5004}
     volumes:
       - ./config:/app/config
     depends_on:
-      - acestream-engine
+      - acexy
