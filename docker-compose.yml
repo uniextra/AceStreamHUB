@@ -14,15 +14,16 @@ services:
       --vod-buffer 10
 
   acexy:
-    image: javinator9889/acexy:latest
+    image: ghcr.io/javinator9889/acexy:0.2.2
     container_name: acexy
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8080:8080"
     environment:
-      - ACESTREAM_HOST=acestream-engine
-      - ACESTREAM_PORT=6878
-      - ACEPROXY_PORT=8000
+      ACEXY_LISTEN_ADDR: ":8080"
+      ACEXY_SCHEME: "http"
+      ACEXY_HOST: "acestream-engine"
+      ACEXY_PORT: "6878"
     depends_on:
       - acestream-engine
 
@@ -33,7 +34,7 @@ services:
     ports:
       - "${WEB_PORT:-5004}:${WEB_PORT:-5004}"
     environment:
-      - ACESTREAM_URL=http://acexy:8000
+      - ACESTREAM_URL=http://acexy:8080
       - DATA_DIR=/app/config
       - WEB_PORT=${WEB_PORT:-5004}
     volumes:

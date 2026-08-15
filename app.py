@@ -1064,7 +1064,7 @@ def stream(channel_id):
                     valid_ace_ids = filtered_ids
                     
             for ace_id in valid_ace_ids:
-                stream_url = f"http://acexy:8000/pid/{ace_id}/stream.mp4"
+                stream_url = f"http://acexy:8080/pid/{ace_id}/stream.mp4"
                 logging.info(f"Attempting to proxy channel {channel_id} from {stream_url} with timeout {timeout}s")
                 try:
                     req = requests.get(stream_url, stream=True, timeout=timeout)
@@ -1189,7 +1189,7 @@ def perform_channel_scan(chno, limit=None):
                         br_label = f"{br_mbps:.1f} Mbps"
                         
                         # Reemplazamos la URL de reproducción por la de nuestro proxy local acexy
-                        playback_url = f"http://acexy:8000/pid/{aid}/stream.mp4"
+                        playback_url = f"http://acexy:8080/pid/{aid}/stream.mp4"
                         
                         cmd = [
                             'ffprobe',
