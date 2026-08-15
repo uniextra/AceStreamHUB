@@ -13,26 +13,6 @@ services:
     volumes:
       - ./config:/config
 
-  httpaceproxy:
-    image: jopsis/httpaceproxy:latest
-    container_name: httpaceproxy
-    restart: unless-stopped
-    ports:
-      - "8888:8888"
-    environment:
-      - ACEPROXY_HOST=0.0.0.0
-      - ACEPROXY_PORT=8888
-      - ACESTREAM_HOST=acestream-engine
-      - ACESTREAM_API_PORT=62062
-      - ACESTREAM_HTTP_PORT=6878
-      - MAX_CONNECTIONS=10
-      - MAX_CONCURRENT_CHANNELS=5
-      - ENABLED_PLUGINS=newera,elcano,acepl,af1c1onados,aio,stat,statplugin
-      - AIO_PLUGINS=newera,elcano,acepl,af1c1onados
-      - ACESTREAM_API_PORT=62062
-    depends_on:
-      - acestream-engine
-    
   proxy-app:
     build: .
     container_name: acestream-hdhr-proxy
@@ -40,11 +20,10 @@ services:
     ports:
       - "${WEB_PORT:-5004}:${WEB_PORT:-5004}"
     environment:
-      - ACESTREAM_URL=http://httpaceproxy:8888
+      - ACESTREAM_URL=http://127.0.0.1:8888
       - DATA_DIR=/app/config
       - WEB_PORT=${WEB_PORT:-5004}
     volumes:
       - ./config:/app/config
     depends_on:
       - acestream-engine
-      - httpaceproxy

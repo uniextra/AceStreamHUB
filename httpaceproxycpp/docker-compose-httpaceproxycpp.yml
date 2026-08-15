@@ -1,0 +1,29 @@
+services:
+  httpaceproxycpp:
+    build:
+      context: ..
+      dockerfile: httpaceproxycpp/Dockerfile
+    image: httpaceproxycpp:latest
+    container_name: httpaceproxycpp
+    ports:
+      - "8888:8888"
+    environment:
+      - ACEPROXY_HOST=0.0.0.0
+      - ACEPROXY_PORT=8888
+      # Point this to an existing AceStream/AceServe engine.
+      # This compose file intentionally does not start AceStream/AceServe.
+      #- ACESTREAM_HOST=${ACESTREAM_HOST:-host.docker.internal}
+      - ACESTREAM_HOST=${ACESTREAM_HOST:-192.168.68.77}
+      - ACESTREAM_API_PORT=${ACESTREAM_API_PORT:-62062}
+      - ACESTREAM_HTTP_PORT=${ACESTREAM_HTTP_PORT:-6878}
+      - MAX_CONNECTIONS=${MAX_CONNECTIONS:-10}
+      - MAX_CONCURRENT_CHANNELS=${MAX_CONCURRENT_CHANNELS:-5}
+      - ENABLED_PLUGINS=${ENABLED_PLUGINS:-newera,elcano,acepl,af1c1onados,aio,stat,statplugin}
+      - AIO_PLUGINS=${AIO_PLUGINS:-newera,elcano,acepl,af1c1onados}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8888/stat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

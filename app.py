@@ -1064,7 +1064,7 @@ def stream(channel_id):
                     valid_ace_ids = filtered_ids
                     
             for ace_id in valid_ace_ids:
-                stream_url = f"http://httpaceproxy:8888/pid/{ace_id}/stream.mp4"
+                stream_url = f"http://127.0.0.1:8888/pid/{ace_id}/stream.mp4"
                 logging.info(f"Attempting to proxy channel {channel_id} from {stream_url} with timeout {timeout}s")
                 try:
                     req = requests.get(stream_url, stream=True, timeout=timeout)
@@ -1188,6 +1188,9 @@ def perform_channel_scan(chno, limit=None):
                         br_mbps = (speed_kbps * 8) / 1000
                         br_label = f"{br_mbps:.1f} Mbps"
                         
+                        # Reemplazamos la URL de reproducción por la de nuestro proxy local en C++
+                        playback_url = f"http://127.0.0.1:8888/pid/{aid}/stream.mp4"
+                        
                         cmd = [
                             'ffprobe',
                             '-v', 'quiet',
@@ -1260,7 +1263,45 @@ def test_channel(chno):
         return jsonify(result), 404
     return jsonify(result)
 
+def run_httpaceproxycpp():
+    import subprocess
+    import time
+    import os
+    
+    proxy_env = os.environ.copy()
+    proxy_env.update({
+        "ACEPROXY_HOST": "0.0.0.0",
+        "ACEPROXY_PORT": "8888",
+        "ACESTREAM_HOST": "acestream-engine",
+        "ACESTREAM_API_PORT": "62062",
+        "ACESTREAM_HTTP_PORT": "6878",
+        "MAX_CONNECTIONS": "10",
+        "MAX_CONCURRENT_CHANNELS": "5",
+        "ENABLED_PLUGINS": "newera,elcano,acepl,af1c1onados,aio,stat,statplugin",
+        "AIO_PLUGINS": "newera,elcano,acepl,af1c1onados"
+    })
+    
+    binary_path = "/app/httpaceproxycpp_bin"
+    if not os.path.exists(binary_path):
+        logging.error(f"HTTPAceProxyCPP binary not found at {binary_path}")
+        return
+        
+    while True:
+        try:
+            logging.info("Starting HTTPAceProxyCPP...")
+            proc = subprocess.Popen([binary_path], env=proxy_env, cwd="/app")
+            proc.wait()
+            logging.warning(f"HTTPAceProxyCPP exited with code {proc.returncode}. Restarting in 3 seconds...")
+        except Exception as e:
+            logging.error(f"Error running HTTPAceProxyCPP: {e}")
+        time.sleep(3)
+
 if __name__ == '__main__':
+    # Start proxy in background
+    import threading
+    proxy_thread = threading.Thread(target=run_httpaceproxycpp, daemon=True)
+    proxy_thread.start()
+    
     db.init_db()
     init_scheduler()
     web_port = int(os.environ.get('WEB_PORT', 5004))

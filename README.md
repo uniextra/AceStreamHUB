@@ -49,19 +49,6 @@ It provides a modern, Apple-inspired Web Dashboard for managing your sources and
          - 1.0.0.1
        volumes:
          - ./config:/config
-   
-     httpaceproxy:
-       image: jopsis/httpaceproxy:latest
-       container_name: httpaceproxy
-       restart: unless-stopped
-       ports:
-         - "8888:8888"
-       environment:
-         - ACESTREAM_HOST=acestream-engine
-         - ACESTREAM_HTTP_PORT=6878
-         - ACESTREAM_API_PORT=62062
-       depends_on:
-         - acestream-engine
        
      proxy-app:
        build: .
@@ -70,7 +57,7 @@ It provides a modern, Apple-inspired Web Dashboard for managing your sources and
        ports:
          - "${WEB_PORT:-5004}:${WEB_PORT:-5004}"
        environment:
-         - ACESTREAM_URL=http://httpaceproxy:8888
+         - ACESTREAM_URL=http://127.0.0.1:8888
          - DATA_DIR=/app/config
          - WEB_PORT=${WEB_PORT:-5004}
          # Opcional: Descomenta temporalmente la siguiente línea si necesitas resetear tu contraseña
@@ -79,7 +66,6 @@ It provides a modern, Apple-inspired Web Dashboard for managing your sources and
          - ./config:/app/config
        depends_on:
          - acestream-engine
-         - httpaceproxy
    ```
 2. Start the stack:
    ```bash
