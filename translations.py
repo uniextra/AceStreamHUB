@@ -121,7 +121,13 @@ translations = {
         "Cerrar Sesión": "Log Out",
         "¡Atención! Modo de reinicio de contraseña activado": "Warning! Password reset mode activated",
         "La variable de entorno": "The environment variable",
-        "está activa en tu contenedor. Debes eliminarla de tu configuración de Docker o docker-compose.yml; de lo contrario, tu contraseña se borrará y se volverá a pedir cada vez que se reinicie el servidor.": "is active in your container. You must remove it from your Docker configuration or docker-compose.yml; otherwise, your password will be deleted and requested again every time the server restarts."
+        "está activa en tu contenedor. Debes eliminarla de tu configuración de Docker o docker-compose.yml; de lo contrario, tu contraseña se borrará y se volverá a pedir cada vez que se reinicie el servidor.": "is active in your container. You must remove it from your Docker configuration or docker-compose.yml; otherwise, your password will be deleted and requested again every time the server restarts.",
+        "Asocia tus canales Acestream a un ID oficial de EPG. Al mapearlos, la lista M3U resultante incluirá la guía de programación.": "Map your discovered Acestream channels to an official EPG channel ID. When mapped, the resulting M3U playlist will perfectly sync with your IPTV player's guide.",
+        "Nombre del Canal Acestream": "Acestream Channel Name",
+        "Streams Disponibles": "Available Streams",
+        "Canal EPG (Asociación)": "EPG Channel (Guide Match)",
+        "orígenes": "sources",
+        "Sin coincidencia EPG": "No EPG Match"
     }
 }
 

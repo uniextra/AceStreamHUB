@@ -31,14 +31,14 @@
 {% block content %}
 <div class="glass-panel rounded-xl p-md mb-lg">
     <p class="font-body-md text-on-surface-variant mb-6">
-        {{ _('Map your discovered Acestream channels to an official EPG channel ID. When mapped, the resulting M3U playlist will perfectly sync with IPTV Smarters Pro!') }}
+        {{ _('Asocia tus canales Acestream a un ID oficial de EPG. Al mapearlos, la lista M3U resultante incluirá la guía de programación.') }}
     </p>
 
     <!-- Header Row -->
     <div class="hidden md:grid grid-cols-12 gap-4 px-4 py-2 border-b border-white/10 mb-4 font-label-sm text-on-surface-variant uppercase tracking-wider">
-        <div class="col-span-5">{{ _('Acestream Channel Name') }}</div>
-        <div class="col-span-3 text-center">{{ _('Available Streams') }}</div>
-        <div class="col-span-4">{{ _('EPG Channel (Guide Match)') }}</div>
+        <div class="col-span-5">{{ _('Nombre del Canal Acestream') }}</div>
+        <div class="col-span-3 text-center">{{ _('Streams Disponibles') }}</div>
+        <div class="col-span-4">{{ _('Canal EPG (Asociación)') }}</div>
     </div>
 
     <!-- Mappings Table -->
@@ -69,7 +69,7 @@
                 
                 <!-- Sources Count -->
                 <div class="col-span-1 md:col-span-3 flex items-center md:justify-center gap-2">
-                    <span class="font-body-md text-on-surface-variant">{{ c.ace_ids | length }} {{ _('sources') }}</span>
+                    <span class="font-body-md text-on-surface-variant">{{ c.ace_ids | length }} {{ _('orígenes') }}</span>
                     <button onclick="toggleDetails('{{ c.GuideNumber }}')" class="p-1 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center justify-center border border-primary/20" title="View Sources">
                         <span id="caret-{{ c.GuideNumber }}" class="material-symbols-outlined text-[18px] transition-transform duration-300">expand_more</span>
                     </button>
@@ -78,7 +78,7 @@
                 <!-- EPG Select -->
                 <div class="col-span-1 md:col-span-4">
                     <select data-channel-id="{{ c.GuideNumber }}" class="epg-select w-full bg-surface-container-highest border border-white/10 text-on-surface font-body-md rounded-lg focus:ring-primary focus:border-primary p-2.5 transition-colors cursor-pointer appearance-none">
-                        <option value="">-- {{ _('No EPG Match') }} --</option>
+                        <option value="">-- {{ _('Sin coincidencia EPG') }} --</option>
                         {% for e in epg_channels %}
                             <option value="{{ e.id }}" class="bg-surface-container-highest" {% if c.mapped_epg_id == e.id %}selected{% endif %}>
                                 {{ e.name }}
