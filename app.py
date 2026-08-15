@@ -1064,7 +1064,7 @@ def stream(channel_id):
                     valid_ace_ids = filtered_ids
                     
             for ace_id in valid_ace_ids:
-                stream_url = f"http://acexy:8080/ace/getstream?id={ace_id}"
+                stream_url = f"http://httpaceproxy:8888/pid/{ace_id}/stream.mp4"
                 logging.info(f"Attempting to proxy channel {channel_id} from {stream_url} with timeout {timeout}s")
                 try:
                     req = requests.get(stream_url, stream=True, timeout=timeout)

@@ -48,28 +48,27 @@ It provides a modern, Apple-inspired Web Dashboard for managing your sources and
        command: >
          /bin/sh -c 'args=$$(cat /config/engine_args.txt 2>/dev/null || echo ""); python main.py --bind-all --live-cache-type memory --live-mem-cache-size 104857600 --disable-sentry --log-stdout --disable-upnp $$args'
    
-     acexy:
-       image: ghcr.io/javinator9889/acexy:0.2.2
-       container_name: acexy
+     httpaceproxy:
+       image: jopsis/httpaceproxy:latest
+       container_name: httpaceproxy
        restart: unless-stopped
        ports:
-         - "8080:8080"
+         - "8888:8888"
        environment:
-         ACEXY_LISTEN_ADDR: ":8080"
-         ACEXY_SCHEME: "http"
-         ACEXY_HOST: "acestream-engine"
-         ACEXY_PORT: "6878"
+         - ACESTREAM_HOST=acestream-engine
+         - ACESTREAM_HTTP_PORT=6878
+         - ACESTREAM_API_PORT=62062
        depends_on:
          - acestream-engine
        
      proxy-app:
-       image: uniextra/acestreamhub:latest
+       build: .
        container_name: acestream-hdhr-proxy
        restart: unless-stopped
        ports:
          - "${WEB_PORT:-5004}:${WEB_PORT:-5004}"
        environment:
-         - ACESTREAM_URL=http://acexy:8080
+         - ACESTREAM_URL=http://httpaceproxy:8888
          - DATA_DIR=/app/config
          - WEB_PORT=${WEB_PORT:-5004}
          # Opcional: Descomenta temporalmente la siguiente línea si necesitas resetear tu contraseña
@@ -78,7 +77,7 @@ It provides a modern, Apple-inspired Web Dashboard for managing your sources and
          - ./config:/app/config
        depends_on:
          - acestream-engine
-         - acexy
+         - httpaceproxy
    ```
 2. Start the stack:
    ```bash
@@ -110,4 +109,4 @@ The `config.json` file generated locally contains your private EPG and Source UR
 
 ## Credits & Acknowledgements
 - `jopsis/docker-acestream-aceserve` for the Dockerized AceStream Engine.
-- `javinator9889/acexy` for the AceStream to HTTP proxy engine.
+- `jopsis/HTTPAceProxy` (httpaceproxycpp) for the AceStream to HTTP proxy engine.
