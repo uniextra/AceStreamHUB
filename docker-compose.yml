@@ -6,12 +6,10 @@ services:
     ports:
       - "6878:6878"
       - "8621:8621"
+    volumes:
+      - ./config:/config
     command: >
-      --core-skip-version-check
-      --log-debug 1
-      --live-cache-type memory
-      --live-buffer 20
-      --vod-buffer 10
+      /bin/bash -c "args=$$(cat /config/engine_args.txt 2>/dev/null || echo ''); mkdir -p /dev/shm/.ACEStream; ./start-engine --client-console --bind-all --live-cache-type memory $$args"
 
   acexy:
     image: ghcr.io/javinator9889/acexy:0.2.2
