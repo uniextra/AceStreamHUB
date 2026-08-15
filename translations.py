@@ -106,7 +106,22 @@ translations = {
         "¿Estás seguro de que quieres eliminar este origen de este canal?": "Are you sure you want to remove this source from this channel?",
         "Guardando...": "Saving...",
         "No channels discovered yet. Go to Sources and add one!": "No channels discovered yet. Go to Sources and add one!",
-        "No sources configured yet. Add one from the panel.": "No sources configured yet. Add one from the panel."
+        "No sources configured yet. Add one from the panel.": "No sources configured yet. Add one from the panel.",
+        "Canal Manual": "Manual Channel",
+        "Añadir Canal / Origen Manual": "Add Manual Channel / Source",
+        "Ej: HBO o Canal Nuevo": "e.g., HBO or New Channel",
+        "Copiar al portapapeles": "Copy to clipboard",
+        "Crea tu contraseña de acceso": "Create your access password",
+        "Autenticación requerida": "Authentication required",
+        "Nueva Contraseña": "New Password",
+        "Contraseña": "Password",
+        "Confirmar Contraseña": "Confirm Password",
+        "Guardar y Entrar": "Save and Enter",
+        "Iniciar Sesión": "Log In",
+        "Cerrar Sesión": "Log Out",
+        "¡Atención! Modo de reinicio de contraseña activado": "Warning! Password reset mode activated",
+        "La variable de entorno": "The environment variable",
+        "está activa en tu contenedor. Debes eliminarla de tu configuración de Docker o docker-compose.yml; de lo contrario, tu contraseña se borrará y se volverá a pedir cada vez que se reinicie el servidor.": "is active in your container. You must remove it from your Docker configuration or docker-compose.yml; otherwise, your password will be deleted and requested again every time the server restarts."
     }
 }
 
