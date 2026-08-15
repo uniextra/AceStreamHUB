@@ -1064,7 +1064,8 @@ def stream(channel_id):
                     valid_ace_ids = filtered_ids
                     
             for ace_id in valid_ace_ids:
-                stream_url = f"http://acexy:8080/ace/getstream?id={ace_id}"
+                proxy_url = os.environ.get('ACESTREAM_URL', 'http://acexy:8080')
+                stream_url = f"{proxy_url}/ace/getstream?id={ace_id}"
                 logging.info(f"Attempting to proxy channel {channel_id} from {stream_url} with timeout {timeout}s")
                 try:
                     req = requests.get(stream_url, stream=True, timeout=timeout)
@@ -1188,7 +1189,8 @@ def perform_channel_scan(chno, limit=None):
                         br_mbps = (speed_kbps * 8) / 1000
                         br_label = f"{br_mbps:.1f} Mbps"
                         
-                        playback_url = f"http://acexy:8080/ace/getstream?id={aid}"
+                        proxy_url = os.environ.get('ACESTREAM_URL', 'http://acexy:8080')
+                        playback_url = f"{proxy_url}/ace/getstream?id={aid}"
                         
                         cmd = [
                             'ffprobe',
