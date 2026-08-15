@@ -63,7 +63,7 @@ It provides a modern, Apple-inspired Web Dashboard for managing your sources and
          - acestream-engine
        
      proxy-app:
-       image: ghcr.io/uniextra/acestreamhub:latest
+       image: uniextra/acestreamhub:latest
        container_name: acestream-hdhr-proxy
        restart: unless-stopped
        ports:
@@ -122,7 +122,7 @@ services:
         condition: service_healthy
 
   proxy-app:
-    image: ghcr.io/uniextra/acestreamhub:latest
+    image: uniextra/acestreamhub:latest
     container_name: acestream-hdhr-proxy
     restart: unless-stopped
     network_mode: "service:gluetun"
