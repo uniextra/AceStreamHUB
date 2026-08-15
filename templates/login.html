@@ -43,20 +43,14 @@
         
         <div class="flex flex-col items-center mb-8 relative z-10">
             <span class="material-symbols-outlined text-[rgb(var(--color-primary))] text-5xl mb-4">cast_connected</span>
-            <div class="flex items-center gap-2">
-                <h1 class="text-3xl font-bold font-['Outfit'] tracking-tight">AceStream Hub</h1>
-                {% if is_default %}
-                <div class="relative group cursor-help flex items-center">
-                    <span class="material-symbols-outlined text-[rgb(var(--color-primary))] text-[22px] opacity-80 hover:opacity-100 transition-opacity">info</span>
-                    <div class="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 bg-[rgb(var(--color-surface-container))] border border-[rgb(var(--color-primary))]/20 rounded-xl p-4 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
-                        <p class="text-sm text-[rgb(var(--color-on-surface))] text-center">{{ _('Las credenciales iniciales por defecto son:') }}</p>
-                        <p class="text-sm font-mono text-[rgb(var(--color-primary))] mt-2 text-center bg-black/20 py-1 rounded">admin / admin</p>
-                        <p class="text-xs text-[rgb(var(--color-on-surface))]/60 mt-2 text-center">{{ _('Puedes cambiarlas a través de variables de entorno en Docker (ADMIN_USER y ADMIN_PASSWORD).') }}</p>
-                    </div>
-                </div>
+            <h1 class="text-3xl font-bold font-['Outfit'] tracking-tight">AceStream Hub</h1>
+            <p class="text-sm text-[rgb(var(--color-on-surface))]/60 mt-2">
+                {% if is_setup %}
+                    {{ _('Crea tu contraseña de acceso') }}
+                {% else %}
+                    {{ _('Autenticación requerida') }}
                 {% endif %}
-            </div>
-            <p class="text-sm text-[rgb(var(--color-on-surface))]/60 mt-2">{{ _('Autenticación requerida') }}</p>
+            </p>
         </div>
 
         {% if error %}
@@ -68,21 +62,25 @@
 
         <form method="POST" class="flex flex-col gap-4 relative z-10">
             <div>
-                <label class="block text-sm font-medium mb-1.5 text-[rgb(var(--color-on-surface))]/80">{{ _('Usuario') }}</label>
-                <input type="text" name="username" required autofocus
+                <label class="block text-sm font-medium mb-1.5 text-[rgb(var(--color-on-surface))]/80">
+                    {% if is_setup %}{{ _('Nueva Contraseña') }}{% else %}{{ _('Contraseña') }}{% endif %}
+                </label>
+                <input type="password" name="password" required autofocus
                     class="w-full bg-[rgb(var(--color-surface-container))] border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))] transition-all">
             </div>
             
+            {% if is_setup %}
             <div>
-                <label class="block text-sm font-medium mb-1.5 text-[rgb(var(--color-on-surface))]/80">{{ _('Contraseña') }}</label>
-                <input type="password" name="password" required
+                <label class="block text-sm font-medium mb-1.5 text-[rgb(var(--color-on-surface))]/80">{{ _('Confirmar Contraseña') }}</label>
+                <input type="password" name="confirm_password" required
                     class="w-full bg-[rgb(var(--color-surface-container))] border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))] transition-all">
             </div>
+            {% endif %}
 
             <button type="submit" 
                 class="mt-4 w-full bg-[rgb(var(--color-primary))]/20 hover:bg-[rgb(var(--color-primary))]/30 text-[rgb(var(--color-primary))] font-semibold rounded-lg px-4 py-3 transition-colors border border-[rgb(var(--color-primary))]/30 flex items-center justify-center gap-2">
-                <span>{{ _('Iniciar Sesión') }}</span>
-                <span class="material-symbols-outlined text-[20px]">login</span>
+                <span>{% if is_setup %}{{ _('Guardar y Entrar') }}{% else %}{{ _('Iniciar Sesión') }}{% endif %}</span>
+                <span class="material-symbols-outlined text-[20px]">{% if is_setup %}save{% else %}login{% endif %}</span>
             </button>
         </form>
     </div>

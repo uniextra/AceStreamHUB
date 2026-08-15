@@ -71,9 +71,8 @@ It provides a modern, Apple-inspired Web Dashboard for managing your sources and
          - ACESTREAM_URL=http://acexy:8080
          - DATA_DIR=/app/config
          - WEB_PORT=${WEB_PORT:-5004}
-         # Variables opcionales para la contraseña de administrador (defecto: admin / admin)
-         # - ADMIN_USER=admin
-         # - ADMIN_PASSWORD=admin
+         # Opcional: Descomenta temporalmente la siguiente línea si necesitas resetear tu contraseña
+         # - RESET_PASSWORD=true
        volumes:
          - ./config:/app/config
        depends_on:
@@ -99,7 +98,7 @@ It provides a modern, Apple-inspired Web Dashboard for managing your sources and
 
 ## Usage
 
-1. **Access the UI**: Open the web dashboard at `http://localhost:5004`. You will be asked to log in. The default credentials are `admin` / `admin`. You can change these via Docker environment variables (`ADMIN_USER` and `ADMIN_PASSWORD`).
+1. **Access the UI**: Open the web dashboard at `http://localhost:5004`. On your very first visit, you will be prompted to create an access password. If you ever forget it, you can reset it by setting `RESET_PASSWORD=true` in your Docker environment variables.
 2. **Add a Source**: Navigate to **Sources** and add your M3U URL (or website URL to scrape). The engine will download and parse the channels.
 3. **Add EPG**: Navigate to **Settings** and paste your XMLTV URL. You can also toggle the **HDHomeRun Emulator** here.
 4. **Map Channels**: Navigate to **Channels & EPG**. Map your AceStream channels to the official EPG guide, run speed tests to find the best peer-to-peer source, and set your primary links.

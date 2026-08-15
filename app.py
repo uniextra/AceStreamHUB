@@ -42,7 +42,8 @@ def inject_translations():
     def translate(text):
         return translations.gettext(text, lang)
         
-    return dict(_=translate, current_lang=lang)
+    reset_active = os.environ.get('RESET_PASSWORD', '').lower() in ('true', '1', 'yes')
+    return dict(_=translate, current_lang=lang, reset_password_active=reset_active)
 
 DATA_DIR = os.environ.get('DATA_DIR', '.')
 CONFIG_FILE = os.path.join(DATA_DIR, 'config.json')
@@ -98,15 +99,13 @@ def setup_security():
         
     app.secret_key = bytes.fromhex(config['secret_key'])
     
-    env_user = os.environ.get('ADMIN_USER')
-    env_pass = os.environ.get('ADMIN_PASSWORD')
-    if env_user and env_pass:
-        config['admin_user'] = env_user
-        config['admin_password_hash'] = generate_password_hash(env_pass)
+    reset_active = os.environ.get('RESET_PASSWORD', '').lower() in ('true', '1', 'yes')
+    if reset_active and 'admin_password_hash' in config:
+        del config['admin_password_hash']
         changed = True
-    elif 'admin_user' not in config or 'admin_password_hash' not in config:
-        config['admin_user'] = 'admin'
-        config['admin_password_hash'] = generate_password_hash('admin')
+        
+    if 'admin_user' in config:
+        del config['admin_user']
         changed = True
         
     if changed:
@@ -534,19 +533,29 @@ def init_scheduler():
 def login():
     config = load_config()
     lang = config.get("settings", {}).get("language", "es")
-    is_default = check_password_hash(config.get('admin_password_hash', ''), 'admin') and config.get('admin_user') == 'admin'
+    is_setup = 'admin_password_hash' not in config
     
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        if username == config.get('admin_user') and check_password_hash(config.get('admin_password_hash', ''), password):
-            session['logged_in'] = True
-            return redirect(request.args.get('next') or url_for('dashboard'))
-        else:
-            return render_template('login.html', error=translations.gettext("Credenciales incorrectas", lang), is_default=is_default)
+        if is_setup:
+            password = request.form.get('password')
+            confirm_password = request.form.get('confirm_password')
             
-    return render_template('login.html', is_default=is_default)
+            if not password or password != confirm_password:
+                return render_template('login.html', error=translations.gettext("Las contraseñas no coinciden", lang), is_setup=True)
+                
+            config['admin_password_hash'] = generate_password_hash(password)
+            save_config(config)
+            session['logged_in'] = True
+            return redirect(url_for('dashboard'))
+        else:
+            password = request.form.get('password')
+            if check_password_hash(config.get('admin_password_hash', ''), password):
+                session['logged_in'] = True
+                return redirect(request.args.get('next') or url_for('dashboard'))
+            else:
+                return render_template('login.html', error=translations.gettext("Contraseña incorrecta", lang), is_setup=False)
+                
+    return render_template('login.html', is_setup=is_setup)
 
 @app.route('/logout')
 def logout():

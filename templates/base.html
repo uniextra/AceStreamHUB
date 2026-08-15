@@ -207,6 +207,15 @@
 
 <!-- Main Content Area -->
 <main class="md:ml-64 pt-20 md:pt-24 px-margin-safe pb-xl min-h-screen">
+    {% if reset_password_active %}
+    <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
+        <span class="material-symbols-outlined text-red-400">warning</span>
+        <div>
+            <h3 class="text-sm font-bold text-red-400">{{ _('¡Atención! Modo de reinicio de contraseña activado') }}</h3>
+            <p class="text-sm text-[rgb(var(--color-on-surface))] mt-1">{{ _('La variable de entorno') }} <code class="bg-black/30 px-1 py-0.5 rounded text-red-300">RESET_PASSWORD=true</code> {{ _('está activa en tu contenedor. Debes eliminarla de tu configuración de Docker o docker-compose.yml; de lo contrario, tu contraseña se borrará y se volverá a pedir cada vez que se reinicie el servidor.') }}</p>
+        </div>
+    </div>
+    {% endif %}
     {% block content %}{% endblock %}
 </main>
 
