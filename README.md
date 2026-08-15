@@ -4,6 +4,12 @@
 
 # AceStream Hub (AceScrapper Proxy)
 
+<p align="center">
+  <a href="https://github.com/uniextra/AceScrapper/actions/workflows/docker-publish.yml"><img src="https://github.com/uniextra/AceScrapper/actions/workflows/docker-publish.yml/badge.svg" alt="Release Pipeline"></a>
+  <a href="https://hub.docker.com/r/uniextra/acestreamhub"><img src="https://img.shields.io/docker/pulls/uniextra/acestreamhub.svg" alt="Docker Pulls"></a>
+  <a href="https://ko-fi.com/uniextra"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-F16061?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+</p>
+
 AceScrapper is a powerful, automated IPTV proxy and M3U generator designed to seamlessly bridge AceStream broadcasts with standard IPTV players (like IPTV Smarters Pro, VLC, etc.). It supports multiple simultaneous channels and features a built-in HDHomeRun emulator for easy integration with your local media servers.
 
 It provides a modern, Apple-inspired Web Dashboard for managing your sources and mappings.
