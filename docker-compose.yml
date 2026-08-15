@@ -1,14 +1,17 @@
 services:
   acestream-engine:
-    image: vstavrinov/acestream-engine:latest
+    image: jopsis/aceserve:latest
     container_name: acestream-engine
     restart: unless-stopped
     ports:
       - "6878:6878"
+      - "8621:8621"
+      - "62062:62062"
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
     volumes:
       - ./config:/config
-    command: >
-      /bin/bash -c "args=$$(cat /config/engine_args.txt 2>/dev/null || echo ''); mkdir -p /dev/shm/.ACEStream; ./start-engine --client-console --bind-all --live-cache-type memory $$args"
 
   httpaceproxy:
     image: jopsis/httpaceproxy:latest
@@ -17,8 +20,15 @@ services:
     ports:
       - "8888:8888"
     environment:
+      - ACEPROXY_HOST=0.0.0.0
+      - ACEPROXY_PORT=8888
       - ACESTREAM_HOST=acestream-engine
+      - ACESTREAM_API_PORT=62062
       - ACESTREAM_HTTP_PORT=6878
+      - MAX_CONNECTIONS=10
+      - MAX_CONCURRENT_CHANNELS=5
+      - ENABLED_PLUGINS=newera,elcano,acepl,af1c1onados,aio,stat,statplugin
+      - AIO_PLUGINS=newera,elcano,acepl,af1c1onados
       - ACESTREAM_API_PORT=62062
     depends_on:
       - acestream-engine
