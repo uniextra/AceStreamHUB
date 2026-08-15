@@ -1,15 +1,14 @@
 services:
   acestream-engine:
-    image: jopsis/aceserve:latest
+    image: vstavrinov/acestream-engine:latest
     container_name: acestream-engine
     restart: unless-stopped
     ports:
       - "6878:6878"
-      - "8621:8621"
     volumes:
       - ./config:/config
     command: >
-      /bin/sh -c 'args=$$(cat /config/engine_args.txt 2>/dev/null || echo ""); python main.py --bind-all --live-cache-type memory --live-mem-cache-size 104857600 --disable-sentry --log-stdout --disable-upnp $$args'
+      /bin/bash -c "args=$$(cat /config/engine_args.txt 2>/dev/null || echo ''); mkdir -p /dev/shm/.ACEStream; ./start-engine --client-console --bind-all --live-cache-type memory $$args"
 
   httpaceproxy:
     image: jopsis/httpaceproxy:latest
