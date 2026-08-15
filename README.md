@@ -37,40 +37,107 @@ It provides a modern, Apple-inspired Web Dashboard for managing your sources and
    ```yaml
    services:
      acestream-engine:
-       image: jopsis/aceserve:latest
+       image: vstavrinov/acestream-engine:latest
        container_name: acestream-engine
        restart: unless-stopped
        ports:
          - "6878:6878"
          - "8621:8621"
-         - "62062:62062"
-       dns:
-         - 1.1.1.1
-         - 1.0.0.1
        volumes:
          - ./config:/config
+       command: >
+         /bin/bash -c "args=$$(cat /config/engine_args.txt 2>/dev/null || echo ''); mkdir -p /dev/shm/.ACEStream; ./start-engine --client-console --bind-all --live-cache-type memory $$args"
+         
+     acexy:
+       image: ghcr.io/javinator9889/acexy:0.2.2
+       container_name: acexy
+       restart: unless-stopped
+       ports:
+         - "8080:8080"
+       environment:
+         ACEXY_LISTEN_ADDR: ":8080"
+         ACEXY_SCHEME: "http"
+         ACEXY_HOST: "acestream-engine"
+         ACEXY_PORT: "6878"
+       depends_on:
+         - acestream-engine
        
      proxy-app:
-       build: .
+       image: ghcr.io/uniextra/acestreamhub:latest
        container_name: acestream-hdhr-proxy
        restart: unless-stopped
        ports:
          - "${WEB_PORT:-5004}:${WEB_PORT:-5004}"
        environment:
-         - ACESTREAM_URL=http://127.0.0.1:8888
+         - ACESTREAM_URL=http://acexy:8080
          - DATA_DIR=/app/config
          - WEB_PORT=${WEB_PORT:-5004}
-         # Opcional: Descomenta temporalmente la siguiente línea si necesitas resetear tu contraseña
+         # Opcional: Descomenta temporalmente la siguiente linea si necesitas resetear tu contrasena
          # - RESET_PASSWORD=true
        volumes:
          - ./config:/app/config
        depends_on:
          - acestream-engine
+         - acexy
    ```
 2. Start the stack:
    ```bash
    docker-compose up -d
    ```
+
+### VPN / Gluetun Configuration (Optional)
+If you want to route all AceStream traffic through a VPN container like Gluetun, you can bind the services to the `gluetun` network space. Update your `docker-compose.yml` like this:
+
+```yaml
+services:
+  acestream-engine:
+    image: vstavrinov/acestream-engine:latest
+    container_name: acestream-engine
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./config:/config
+    command: >
+      /bin/bash -c "args=$$(cat /config/engine_args.txt 2>/dev/null || echo ''); mkdir -p /dev/shm/.ACEStream; ./start-engine --client-console --bind-all --live-cache-type memory $$args"
+    depends_on:
+      gluetun:
+        condition: service_healthy
+
+  acexy:
+    image: ghcr.io/javinator9889/acexy:0.2.2
+    container_name: acexy
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      ACEXY_LISTEN_ADDR: ":8080"
+      ACEXY_SCHEME: "http"
+      ACEXY_HOST: "127.0.0.1"
+      ACEXY_PORT: "6878"
+    depends_on:
+      gluetun:
+        condition: service_healthy
+
+  proxy-app:
+    image: ghcr.io/uniextra/acestreamhub:latest
+    container_name: acestream-hdhr-proxy
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - ACESTREAM_URL=http://127.0.0.1:8080
+      - DATA_DIR=/app/config
+      - WEB_PORT=${WEB_PORT:-5004}
+    volumes:
+      - ./config:/app/config
+    depends_on:
+      gluetun:
+        condition: service_healthy
+```
 
 ### Option B: Build from Source
 
@@ -96,5 +163,5 @@ It provides a modern, Apple-inspired Web Dashboard for managing your sources and
 The `config.json` file generated locally contains your private EPG and Source URLs. It is safely ignored via `.gitignore` and will never be uploaded to this repository.
 
 ## Credits & Acknowledgements
-- `jopsis/docker-acestream-aceserve` for the Dockerized AceStream Engine.
-- `jopsis/HTTPAceProxy` (httpaceproxycpp) for the AceStream to HTTP proxy engine.
+- `vstavrinov/acestream-engine` for the Dockerized AceStream Engine.
+- `javinator9889/acexy` for the AceStream to HTTP proxy engine.
