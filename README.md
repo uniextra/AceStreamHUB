@@ -130,6 +130,7 @@ services:
       - no-new-privileges:true
     environment:
       - ACESTREAM_URL=http://127.0.0.1:8080
+      - ENGINE_URL=http://127.0.0.1:6878
       - DATA_DIR=/app/config
       - WEB_PORT=${WEB_PORT:-5004}
     volumes:

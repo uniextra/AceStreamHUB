@@ -1166,7 +1166,7 @@ def perform_channel_scan(chno, limit=None):
         speed_kbps = 0
         
         try:
-            engine_url = "http://acestream-engine:6878"
+            engine_url = os.environ.get('ENGINE_URL', 'http://acestream-engine:6878')
             getstream_url = f"{engine_url}/ace/getstream?id={aid}&format=json"
             r = requests.get(getstream_url, timeout=10)
             if r.status_code == 200:
