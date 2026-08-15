@@ -37,15 +37,18 @@ It provides a modern, Apple-inspired Web Dashboard for managing your sources and
    ```yaml
    services:
      acestream-engine:
-       image: vstavrinov/acestream-engine:latest
+       image: jopsis/aceserve:latest
        container_name: acestream-engine
        restart: unless-stopped
        ports:
          - "6878:6878"
+         - "8621:8621"
+         - "62062:62062"
+       dns:
+         - 1.1.1.1
+         - 1.0.0.1
        volumes:
          - ./config:/config
-       command: >
-         /bin/bash -c "args=$$(cat /config/engine_args.txt 2>/dev/null || echo ''); mkdir -p /dev/shm/.ACEStream; ./start-engine --client-console --bind-all --live-cache-type memory $$args"
    
      httpaceproxy:
        image: jopsis/httpaceproxy:latest
@@ -107,5 +110,5 @@ It provides a modern, Apple-inspired Web Dashboard for managing your sources and
 The `config.json` file generated locally contains your private EPG and Source URLs. It is safely ignored via `.gitignore` and will never be uploaded to this repository.
 
 ## Credits & Acknowledgements
-- `vstavrinov/acestream-engine` for the Dockerized AceStream Engine.
+- `jopsis/docker-acestream-aceserve` for the Dockerized AceStream Engine.
 - `jopsis/HTTPAceProxy` (httpaceproxycpp) for the AceStream to HTTP proxy engine.
