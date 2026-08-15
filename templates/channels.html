@@ -123,8 +123,9 @@
                                         </button>
                                     </div>
                                 </td>
-                                <td class="py-2 px-2 text-on-surface-variant font-body-sm">{{ s.info if s and s.info else 'N/A' }}</td>
-                                <td class="py-2 px-2 text-on-surface-variant font-body-sm">{{ s.bitrate if s and s.bitrate else 'N/A' }}</td>
+                                <td id="resolucion-{{ c.GuideNumber }}-{{ aid }}" class="py-2 px-2 text-on-surface-variant font-body-sm">{{ s.resolution if s else 'N/A' }}</td>
+                                <td id="peers-{{ c.GuideNumber }}-{{ aid }}" class="py-2 px-2 text-on-surface-variant font-body-sm">{{ s.peers if s else 'N/A' }}</td>
+                                <td id="velocidad-{{ c.GuideNumber }}-{{ aid }}" class="py-2 px-2 text-on-surface-variant font-body-sm">{{ s.bitrate if s else 'N/A' }}</td>
                                 <td id="res-{{ c.GuideNumber }}-{{ aid }}" class="py-2 px-2 text-on-surface-variant font-body-sm">{{ '%.1f'|format(s.time) ~ 's' if s and s.time else 'N/A' }}</td>
                                 <td class="py-2 px-2 text-right text-on-surface-variant font-body-sm">
                                     {% if s and s.last_updated %}
@@ -274,15 +275,32 @@ async function testChannel(chno) {
         const data = await response.json();
         
         data.results.forEach(res => {
-            const el = document.getElementById(`res-${chno}-${res.id}`);
-            if (el) {
+            const elTime = document.getElementById(`res-${chno}-${res.id}`);
+            const elRes = document.getElementById(`resolucion-${chno}-${res.id}`);
+            const elPeers = document.getElementById(`peers-${chno}-${res.id}`);
+            const elVelocidad = document.getElementById(`velocidad-${chno}-${res.id}`);
+            
+            if (elTime) {
                 if (res.success) {
-                    el.style.color = '#34C759';
-                    const infoStr = res.info ? `${res.info}` : `Online (${res.time.toFixed(1)}s)`;
-                    el.innerText = infoStr;
+                    elTime.style.color = '#34C759';
+                    elTime.innerText = `${res.time.toFixed(1)}s`;
+                    
+                    if (res.info) {
+                        let parts = res.info.split('|').map(s => s.trim());
+                        if (parts.length >= 3) {
+                            if (elRes) elRes.innerText = parts[0];
+                            if (elVelocidad) elVelocidad.innerText = parts[1];
+                            if (elPeers) elPeers.innerText = parts[2].replace("Peers:", "").trim();
+                        } else {
+                            if (elRes) elRes.innerText = res.info;
+                        }
+                    }
                 } else {
-                    el.style.color = '#ffb4ab'; // Stitch error color
-                    el.innerText = 'Offline';
+                    elTime.style.color = '#ffb4ab'; // Stitch error color
+                    elTime.innerText = 'Offline';
+                    if (elRes) elRes.innerText = 'N/A';
+                    if (elPeers) elPeers.innerText = 'N/A';
+                    if (elVelocidad) elVelocidad.innerText = 'N/A';
                     const starBtn = document.getElementById(`star-${chno}-${res.id}`);
                     if (starBtn && !starBtn.parentNode.querySelector('.text-error[title="Error de conexión"]')) {
                         starBtn.insertAdjacentHTML('afterend', '<span class="material-symbols-outlined text-error text-[16px] ml-1" title="Error de conexión">error</span>');

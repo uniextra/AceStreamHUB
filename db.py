@@ -81,10 +81,26 @@ def get_all_scans():
         # Convert to dictionary for easy lookup in template: { "ace_id": { ... } }
         scans = {}
         for r in rows:
+            info_str = r['info'] if r['info'] else ""
+            res = "N/A"
+            bitrate = "N/A"
+            peers = "N/A"
+            if info_str:
+                parts = [p.strip() for p in info_str.split('|')]
+                if len(parts) >= 3:
+                    res = parts[0]
+                    bitrate = parts[1]
+                    peers = parts[2].replace("Peers:", "").strip()
+                else:
+                    res = info_str
+                    
             scans[r['ace_id']] = {
                 "success": bool(r['success']),
                 "time": r['time'],
-                "info": r['info'],
+                "info": info_str,
+                "resolution": res,
+                "bitrate": bitrate,
+                "peers": peers,
                 "last_updated": r['last_updated'],
                 "consecutive_fails": r['consecutive_fails'] if 'consecutive_fails' in r.keys() else 0
             }
