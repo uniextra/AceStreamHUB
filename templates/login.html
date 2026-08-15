@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - AceStream Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <style>
+        :root {
+            --color-primary: 153, 225, 217;
+            --color-on-primary: 0, 55, 52;
+            --color-surface: 15, 21, 20;
+            --color-on-surface: 220, 229, 227;
+            --color-surface-container: 26, 33, 32;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: rgb(var(--color-surface));
+            color: rgb(var(--color-on-surface));
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(var(--color-primary), 0.05), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(var(--color-primary), 0.08), transparent 25%);
+            background-attachment: fixed;
+        }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', sans-serif; }
+        .glass-panel {
+            background: rgba(var(--color-surface-container), 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="glass-panel w-full max-w-md rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+        <!-- Decoration -->
+        <div class="absolute -top-24 -right-24 w-48 h-48 bg-[rgb(var(--color-primary))] opacity-10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-[rgb(var(--color-primary))] opacity-10 rounded-full blur-3xl pointer-events-none"></div>
+        
+        <div class="flex flex-col items-center mb-8 relative z-10">
+            <span class="material-symbols-outlined text-[rgb(var(--color-primary))] text-5xl mb-4">cast_connected</span>
+            <h1 class="text-3xl font-bold font-['Outfit'] tracking-tight">AceStream Hub</h1>
+            <p class="text-sm text-[rgb(var(--color-on-surface))]/60 mt-2">{{ _('Autenticación requerida') }}</p>
+        </div>
+
+        {% if is_default %}
+        <div class="bg-[rgb(var(--color-primary))]/10 border border-[rgb(var(--color-primary))]/20 rounded-xl p-4 mb-6 flex items-start gap-3 relative z-10">
+            <span class="material-symbols-outlined text-[rgb(var(--color-primary))]">info</span>
+            <div>
+                <p class="text-sm text-[rgb(var(--color-on-surface))]">{{ _('Las credenciales iniciales por defecto son:') }}</p>
+                <p class="text-sm font-mono text-[rgb(var(--color-primary))] mt-1">Usuario: admin<br>Contraseña: admin</p>
+                <p class="text-xs text-[rgb(var(--color-on-surface))]/60 mt-2">{{ _('Puedes cambiarlas desde los Ajustes o a través de variables de entorno en Docker.') }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if error %}
+        <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6 flex items-center gap-3 relative z-10">
+            <span class="material-symbols-outlined text-red-400">error</span>
+            <p class="text-sm text-red-400">{{ error }}</p>
+        </div>
+        {% endif %}
+
+        <form method="POST" class="flex flex-col gap-4 relative z-10">
+            <div>
+                <label class="block text-sm font-medium mb-1.5 text-[rgb(var(--color-on-surface))]/80">{{ _('Usuario') }}</label>
+                <input type="text" name="username" required autofocus
+                    class="w-full bg-[rgb(var(--color-surface-container))] border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))] transition-all">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium mb-1.5 text-[rgb(var(--color-on-surface))]/80">{{ _('Contraseña') }}</label>
+                <input type="password" name="password" required
+                    class="w-full bg-[rgb(var(--color-surface-container))] border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))] transition-all">
+            </div>
+
+            <button type="submit" 
+                class="mt-4 w-full bg-[rgb(var(--color-primary))]/20 hover:bg-[rgb(var(--color-primary))]/30 text-[rgb(var(--color-primary))] font-semibold rounded-lg px-4 py-3 transition-colors border border-[rgb(var(--color-primary))]/30 flex items-center justify-center gap-2">
+                <span>{{ _('Iniciar Sesión') }}</span>
+                <span class="material-symbols-outlined text-[20px]">login</span>
+            </button>
+        </form>
+    </div>
+
+</body>
+</html>

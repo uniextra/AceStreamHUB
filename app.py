@@ -9,8 +9,10 @@ import datetime
 import xml.etree.ElementTree as ET
 import time
 import threading
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 from bs4 import BeautifulSoup
-from flask import Flask, jsonify, request, Response, render_template, redirect, url_for, stream_with_context
+from flask import Flask, jsonify, request, Response, render_template, redirect, url_for, stream_with_context, session
 from apscheduler.schedulers.background import BackgroundScheduler
 from thefuzz import process, fuzz
 import db
@@ -85,6 +87,43 @@ def load_config():
 def save_config(config):
     with open(CONFIG_FILE, 'w') as f:
         json.dump(config, f, indent=4)
+
+def setup_security():
+    config = load_config()
+    changed = False
+    
+    if 'secret_key' not in config:
+        config['secret_key'] = os.urandom(24).hex()
+        changed = True
+        
+    app.secret_key = bytes.fromhex(config['secret_key'])
+    
+    env_user = os.environ.get('ADMIN_USER')
+    env_pass = os.environ.get('ADMIN_PASSWORD')
+    if env_user and env_pass:
+        config['admin_user'] = env_user
+        config['admin_password_hash'] = generate_password_hash(env_pass)
+        changed = True
+    elif 'admin_user' not in config or 'admin_password_hash' not in config:
+        config['admin_user'] = 'admin'
+        config['admin_password_hash'] = generate_password_hash('admin')
+        changed = True
+        
+    if changed:
+        save_config(config)
+
+setup_security()
+
+@app.before_request
+def require_login():
+    allowed_endpoints = ['login', 'logout', 'static', 'playlist', 'epg_xml_endpoint', 
+                         'hdhr_discover', 'hdhr_lineup_status', 'hdhr_lineup', 
+                         'hdhr_lineup_post', 'stream']
+    if request.endpoint and request.endpoint not in allowed_endpoints:
+        if not session.get('logged_in'):
+            if request.path.startswith('/api/'):
+                return jsonify({"error": "Unauthorized"}), 401
+            return redirect(url_for('login', next=request.url))
 
 def get_stable_id(name):
     return str(int(hashlib.md5(name.encode('utf-8')).hexdigest(), 16) % 9000 + 1000)
@@ -490,6 +529,29 @@ def init_scheduler():
         scheduler.start()
 
 # --- ROUTES ---
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    config = load_config()
+    lang = config.get("settings", {}).get("language", "es")
+    is_default = check_password_hash(config.get('admin_password_hash', ''), 'admin') and config.get('admin_user') == 'admin'
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if username == config.get('admin_user') and check_password_hash(config.get('admin_password_hash', ''), password):
+            session['logged_in'] = True
+            return redirect(request.args.get('next') or url_for('dashboard'))
+        else:
+            return render_template('login.html', error=translations.gettext("Credenciales incorrectas", lang), is_default=is_default)
+            
+    return render_template('login.html', is_default=is_default)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 
 @app.route('/')
 def index():
