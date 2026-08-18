@@ -7,6 +7,7 @@
 <p align="center">
   <a href="https://github.com/uniextra/AceScrapper/actions/workflows/docker-publish.yml"><img src="https://github.com/uniextra/AceScrapper/actions/workflows/docker-publish.yml/badge.svg" alt="Release Pipeline"></a>
   <a href="https://hub.docker.com/r/uniextra/acestreamhub"><img src="https://img.shields.io/docker/pulls/uniextra/acestreamhub.svg" alt="Docker Pulls"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://ko-fi.com/uniextra"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-F16061?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
 </p>
 
@@ -166,3 +167,7 @@ The `config.json` file generated locally contains your private EPG and Source UR
 ## Credits & Acknowledgements
 - `vstavrinov/acestream-engine` for the Dockerized AceStream Engine.
 - `javinator9889/acexy` for the AceStream to HTTP proxy engine.
+
+## License
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
+
