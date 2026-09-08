@@ -5,3 +5,4 @@ beautifulsoup4==4.12.2
 APScheduler
 thefuzz==0.22.1
 python-Levenshtein==0.25.1
+gunicorn==21.2.0

@@ -11,4 +11,4 @@ COPY . .
 
 EXPOSE 5004
 
-CMD ["python", "app.py"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${WEB_PORT:-5004} --workers 1 --threads 16 --timeout 120 app:app"]

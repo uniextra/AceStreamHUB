@@ -9,6 +9,7 @@ import datetime
 import xml.etree.ElementTree as ET
 import time
 import threading
+import subprocess
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from bs4 import BeautifulSoup
@@ -22,17 +23,14 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 @app.after_request
-def add_header(r):
-    r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    r.headers["Pragma"] = "no-cache"
-    r.headers["Expires"] = "0"
-    r.headers['Cache-Control'] = 'public, max-age=0'
-    response_headers = r
-    response_headers.headers.add('Access-Control-Allow-Origin', '*')
-    response_headers.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response_headers.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    response_headers.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    return response_headers
+def add_header(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET,PUT,POST,DELETE,OPTIONS"
+    return response
 
 @app.context_processor
 def inject_translations():
@@ -48,6 +46,11 @@ def inject_translations():
 DATA_DIR = os.environ.get('DATA_DIR', '.')
 CONFIG_FILE = os.path.join(DATA_DIR, 'config.json')
 
+# Thread synchronization locks
+config_lock = threading.Lock()
+channels_lock = threading.RLock()
+active_clients_lock = threading.Lock()
+
 # Global Data structures
 raw_sources_db = {} # source_id -> list of channels
 epg_sources_db = {} # source_id -> list of epg_channels
@@ -56,38 +59,40 @@ epg_channels = [] # global list of all mapped channels
 channels_db = [] # final list of unified channels
 
 active_clients_count = 0
-active_clients_lock = threading.Lock()
 
 scheduler = BackgroundScheduler()
 
 def load_config():
     default = {"sources": [], "epg_url": "", "mappings": {}, "settings": {}, "preferred_ids": {}, "last_scans": {}}
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, 'r') as f:
-                data = json.load(f)
-                
-                # Migration from old format
-                if "sources" not in data and "source_url" in data and data["source_url"]:
-                    data["sources"] = [{
-                        "id": str(uuid.uuid4())[:8],
-                        "name": "Default Source",
-                        "url": data["source_url"],
-                        "type": data.get("source_type", "m3u"),
-                        "interval_minutes": 60,
-                        "last_run": None,
-                        "status": "Pending"
-                    }]
-                
-                default.update(data)
-                return default
-        except Exception as e:
-            logging.error(f"Error loading config: {e}")
+    with config_lock:
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    
+                    # Migration from old format
+                    if "sources" not in data and "source_url" in data and data["source_url"]:
+                        data["sources"] = [{
+                            "id": str(uuid.uuid4())[:8],
+                            "name": "Default Source",
+                            "url": data["source_url"],
+                            "type": data.get("source_type", "m3u"),
+                            "interval_minutes": 60,
+                            "last_run": None,
+                            "status": "Pending"
+                        }]
+                    
+                    default.update(data)
+                    return default
+            except Exception as e:
+                logging.error(f"Error loading config: {e}")
     return default
 
 def save_config(config):
-    with open(CONFIG_FILE, 'w') as f:
-        json.dump(config, f, indent=4)
+    with config_lock:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=4)
+
 
 def setup_security():
     config = load_config()
@@ -343,27 +348,28 @@ def fetch_source_job(source_id, force=False):
         except Exception as e:
             logging.error(f"Failed to save cache for {source_id}: {e}")
 
-    if src_type == 'epg':
-        epg_sources_db[source_id] = raw_ch or []
-        epg_programmes_db[source_id] = raw_prog or []
+    with channels_lock:
+        if src_type == 'epg':
+            epg_sources_db[source_id] = raw_ch or []
+            epg_programmes_db[source_id] = raw_prog or []
+            
+            global epg_channels
+            global epg_programmes
+            
+            merged_epg = []
+            for k, v in epg_sources_db.items():
+                merged_epg.extend(v)
+            epg_channels = sorted(merged_epg, key=lambda x: x['name'])
+            
+            merged_prog = []
+            for k, v in epg_programmes_db.items():
+                merged_prog.extend(v)
+            epg_programmes = merged_prog
+            
+            logging.info(f"Merged {len(epg_channels)} total EPG channels and {len(epg_programmes)} total programmes")
+        else:
+            raw_sources_db[source_id] = raw or []
         
-        global epg_channels
-        global epg_programmes
-        
-        merged_epg = []
-        for k, v in epg_sources_db.items():
-            merged_epg.extend(v)
-        epg_channels = sorted(merged_epg, key=lambda x: x['name'])
-        
-        merged_prog = []
-        for k, v in epg_programmes_db.items():
-            merged_prog.extend(v)
-        epg_programmes = merged_prog
-        
-        logging.info(f"Merged {len(epg_channels)} total EPG channels and {len(epg_programmes)} total programmes")
-    else:
-        raw_sources_db[source_id] = raw or []
-    
     if not use_cache:
         source["last_run"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if src_type == 'epg':
@@ -376,129 +382,130 @@ def fetch_source_job(source_id, force=False):
 
 def rebuild_channels_db():
     global channels_db
-    config = load_config()
-    mappings = config.get("mappings", {})
-    blacklist = config.get("blacklist_ids", [])
-    
-    grouped = {}
-    
-    # Process raw_sources
-    for src_id, items in raw_sources_db.items():
-        for item in items:
+    with channels_lock:
+        config = load_config()
+        mappings = config.get("mappings", {})
+        blacklist = config.get("blacklist_ids", [])
+        
+        grouped = {}
+        
+        # Process raw_sources
+        for src_id, items in raw_sources_db.items():
+            for item in items:
+                ace_id = item['ace_id']
+                if ace_id in blacklist:
+                    continue
+                    
+                title = item['title']
+                extinf = item.get('extinf')
+                provided_tvg_id = item.get('provided_tvg_id')
+                provided_logo = item.get('provided_logo')
+                
+                base_title = title.rstrip('* ').strip()
+                
+                # Clean specific provider suffixes
+                if '-->' in base_title:
+                    base_title = base_title.split('-->')[0].strip()
+                    
+                base_title = re.sub(r'(?i)\s+(1080p|720p|4k|hd|fhd|sd|hevc|h265|x265)\s*$', '', base_title).strip()
+                
+                if base_title not in grouped:
+                    grouped[base_title] = {"ace_ids": [], "extinf": extinf, "title": base_title, "provided_tvg_id": provided_tvg_id, "provided_logo": provided_logo}
+                    
+                grouped[base_title]["ace_ids"].append(ace_id)
+                if not grouped[base_title]["extinf"] and extinf:
+                    grouped[base_title]["extinf"] = extinf
+                if provided_tvg_id and not grouped[base_title].get("provided_tvg_id"):
+                    grouped[base_title]["provided_tvg_id"] = provided_tvg_id
+                if provided_logo and not grouped[base_title].get("provided_logo"):
+                    grouped[base_title]["provided_logo"] = provided_logo
+
+        # Process manual sources
+        manual_sources = config.get("manual_sources", [])
+        for item in manual_sources:
             ace_id = item['ace_id']
             if ace_id in blacklist:
                 continue
                 
-            title = item['title']
-            extinf = item.get('extinf')
-            provided_tvg_id = item.get('provided_tvg_id')
-            provided_logo = item.get('provided_logo')
-            
-            base_title = title.rstrip('* ').strip()
-            
-            # Clean specific provider suffixes
-            if '-->' in base_title:
-                base_title = base_title.split('-->')[0].strip()
-                
-            base_title = re.sub(r'(?i)\s+(1080p|720p|4k|hd|fhd|sd|hevc|h265|x265)\s*$', '', base_title).strip()
-            
+            base_title = item['title'].strip()
             if base_title not in grouped:
-                grouped[base_title] = {"ace_ids": [], "extinf": extinf, "title": base_title, "provided_tvg_id": provided_tvg_id, "provided_logo": provided_logo}
+                grouped[base_title] = {"ace_ids": [], "extinf": None, "title": base_title, "provided_tvg_id": None, "provided_logo": None}
                 
             grouped[base_title]["ace_ids"].append(ace_id)
-            if not grouped[base_title]["extinf"] and extinf:
-                grouped[base_title]["extinf"] = extinf
-            if provided_tvg_id and not grouped[base_title].get("provided_tvg_id"):
-                grouped[base_title]["provided_tvg_id"] = provided_tvg_id
-            if provided_logo and not grouped[base_title].get("provided_logo"):
-                grouped[base_title]["provided_logo"] = provided_logo
-
-    # Process manual sources
-    manual_sources = config.get("manual_sources", [])
-    for item in manual_sources:
-        ace_id = item['ace_id']
-        if ace_id in blacklist:
-            continue
-            
-        base_title = item['title'].strip()
-        if base_title not in grouped:
-            grouped[base_title] = {"ace_ids": [], "extinf": None, "title": base_title, "provided_tvg_id": None, "provided_logo": None}
-            
-        grouped[base_title]["ace_ids"].append(ace_id)
-            
-    channels = []
-    used_chnos = set()
-    
-    for base_title, data in grouped.items():
-        chno = get_stable_id(base_title)
-        while chno in used_chnos:
-            chno = str(int(chno) + 1)
-        used_chnos.add(chno)
-        
-        epg_id = mappings.get(chno, "")
-        if not epg_id and data.get("provided_tvg_id"):
-            epg_id = data["provided_tvg_id"]
-        
-        pref_id = config.get("preferred_ids", {}).get(chno)
-        ace_ids = list(set(data["ace_ids"]))
-        if pref_id and pref_id in ace_ids:
-            ace_ids.remove(pref_id)
-            ace_ids.insert(0, pref_id)
-            
-        channels.append({
-            "GuideNumber": chno,
-            "GuideName": base_title,
-            "URL": f"/auto/v{chno}",
-            "ace_ids": ace_ids,
-            "extinf": data["extinf"],
-            "mapped_epg_id": epg_id,
-            "mapped_epg_logo": data.get("provided_logo", ""),
-            "preferred_id": pref_id
-        })
-        
-    channels.sort(key=lambda x: x["GuideName"])
-    
-    # Auto-mapping logic
-    def clean_string(s):
-        s = s.lower()
-        s = re.sub(r'[^a-z0-9]', ' ', s)
-        s = re.sub(r'\b(hd|fhd|4k|1080p|720p)\b', '', s)
-        return s.strip()
-        
-    if epg_channels:
-        epg_names = {clean_string(e["name"]): e["id"] for e in epg_channels}
-        epg_names_list = list(epg_names.keys())
-        
-        for c in channels:
-            if not c["mapped_epg_id"]:
-                c_clean = clean_string(c["GuideName"])
-                if not c_clean:
-                    continue
-                # Use fuzzywuzzy to find the best match
-                match, score = process.extractOne(c_clean, epg_names_list, scorer=fuzz.token_set_ratio)
-                # If score is > 85%, we consider it a match
-                if score >= 85:
-                    mapped_id = epg_names[match]
-                    c["mapped_epg_id"] = mapped_id
-                    config["mappings"][c["GuideNumber"]] = mapped_id
-                    
-            if c["mapped_epg_id"]:
-                if not c.get("mapped_epg_logo"):
-                    c["mapped_epg_logo"] = next((e["logo"] for e in epg_channels if e["id"] == c["mapped_epg_id"]), "")
-        
-        # Generate SequenceNumber based on custom order
-        custom_order = config.get("custom_order", [])
-        def sort_key(c):
-            try:
-                return (0, custom_order.index(c["GuideNumber"]))
-            except ValueError:
-                return (1, c["GuideName"])
                 
-        channels.sort(key=sort_key)
+        channels = []
+        used_chnos = set()
         
-        for i, c in enumerate(channels, 1):
-            c["SequenceNumber"] = i
+        for base_title, data in grouped.items():
+            chno = get_stable_id(base_title)
+            while chno in used_chnos:
+                chno = str(int(chno) + 1)
+            used_chnos.add(chno)
             
+            epg_id = mappings.get(chno, "")
+            if not epg_id and data.get("provided_tvg_id"):
+                epg_id = data["provided_tvg_id"]
+            
+            pref_id = config.get("preferred_ids", {}).get(chno)
+            ace_ids = list(set(data["ace_ids"]))
+            if pref_id and pref_id in ace_ids:
+                ace_ids.remove(pref_id)
+                ace_ids.insert(0, pref_id)
+                
+            channels.append({
+                "GuideNumber": chno,
+                "GuideName": base_title,
+                "URL": f"/auto/v{chno}",
+                "ace_ids": ace_ids,
+                "extinf": data["extinf"],
+                "mapped_epg_id": epg_id,
+                "mapped_epg_logo": data.get("provided_logo", ""),
+                "preferred_id": pref_id
+            })
+            
+        channels.sort(key=lambda x: x["GuideName"])
+        
+        # Auto-mapping logic
+        def clean_string(s):
+            s = s.lower()
+            s = re.sub(r'[^a-z0-9]', ' ', s)
+            s = re.sub(r'\b(hd|fhd|4k|1080p|720p)\b', '', s)
+            return s.strip()
+            
+        if epg_channels:
+            epg_names = {clean_string(e["name"]): e["id"] for e in epg_channels}
+            epg_names_list = list(epg_names.keys())
+            
+            for c in channels:
+                if not c["mapped_epg_id"]:
+                    c_clean = clean_string(c["GuideName"])
+                    if not c_clean:
+                        continue
+                    # Use fuzzywuzzy to find the best match
+                    match, score = process.extractOne(c_clean, epg_names_list, scorer=fuzz.token_set_ratio)
+                    # If score is > 85%, we consider it a match
+                    if score >= 85:
+                        mapped_id = epg_names[match]
+                        c["mapped_epg_id"] = mapped_id
+                        config["mappings"][c["GuideNumber"]] = mapped_id
+                        
+                if c["mapped_epg_id"]:
+                    if not c.get("mapped_epg_logo"):
+                        c["mapped_epg_logo"] = next((e["logo"] for e in epg_channels if e["id"] == c["mapped_epg_id"]), "")
+            
+            # Generate SequenceNumber based on custom order
+            custom_order = config.get("custom_order", [])
+            def sort_key(c):
+                try:
+                    return (0, custom_order.index(c["GuideNumber"]))
+                except ValueError:
+                    return (1, c["GuideName"])
+                    
+            channels.sort(key=sort_key)
+            
+            for i, c in enumerate(channels, 1):
+                c["SequenceNumber"] = i
+                
         channels_db = channels
         logging.info(f"Rebuilt channels_db: {len(channels)} unique channels.")
 
@@ -616,9 +623,10 @@ def delete_source(source_id):
     config = load_config()
     config["sources"] = [s for s in config.get("sources", []) if s["id"] != source_id]
     save_config(config)
-    if source_id in raw_sources_db:
-        del raw_sources_db[source_id]
-        rebuild_channels_db()
+    with channels_lock:
+        if source_id in raw_sources_db:
+            del raw_sources_db[source_id]
+            rebuild_channels_db()
     init_scheduler()
     return jsonify({"status": "success"})
 
@@ -635,7 +643,7 @@ def channels_view():
         try:
             last_dt = datetime.datetime.strptime(s["last_updated"], "%Y-%m-%d %H:%M:%S")
             s["minutes_ago"] = int((now - last_dt).total_seconds() / 60)
-        except:
+        except (ValueError, TypeError, KeyError):
             s["minutes_ago"] = 0
             
         info = s.get("info", "")
@@ -654,23 +662,28 @@ def channels_view():
             s["bitrate"] = "N/A"
             s["peers"] = "N/A"
             
-    return render_template('channels.html', channels=channels_db, epg_channels=epg_channels, scan_db=scan_db)
+    with channels_lock:
+        current_channels = list(channels_db)
+        current_epg = list(epg_channels)
+    return render_template('channels.html', channels=current_channels, epg_channels=current_epg, scan_db=scan_db)
 
 @app.route('/epg')
 def epg_view():
-    # Only show channels that are mapped
-    mapped_channels = [c for c in channels_db if c.get("mapped_epg_id")]
+    with channels_lock:
+        mapped_channels = [dict(c) for c in channels_db if c.get("mapped_epg_id")]
+        current_progs = list(epg_programmes)
     
     # Group programmes by EPG ID
     grouped_progs = {}
-    for p in epg_programmes:
-        cid = p["channel"]
-        if cid not in grouped_progs:
-            grouped_progs[cid] = []
-        grouped_progs[cid].append(p)
+    for p in current_progs:
+        cid = p.get("channel")
+        if cid:
+            if cid not in grouped_progs:
+                grouped_progs[cid] = []
+            grouped_progs[cid].append(p)
         
     for cid in grouped_progs:
-        grouped_progs[cid].sort(key=lambda x: x["start_time"])
+        grouped_progs[cid].sort(key=lambda x: x.get("start_time", 0))
         
     # Inject programmes into mapped channels
     for c in mapped_channels:
@@ -826,8 +839,10 @@ def delete_source_id(guide_num, ace_id):
 
 @app.route('/playlist.m3u')
 def playlist():
+    with channels_lock:
+        current_channels = list(channels_db)
     lines = ["#EXTM3U"]
-    for c in channels_db:
+    for c in current_channels:
         extinf = c.get("extinf", "")
         
         if not extinf:
@@ -862,18 +877,21 @@ def playlist():
 
 @app.route('/epg.xml')
 def epg_xml_endpoint():
-    import xml.etree.ElementTree as ET
-    from xml.dom import minidom
     root = ET.Element("tv", {"generator-info-name": "AceStream Hub"})
     
-    grouped_progs = {}
-    for p in epg_programmes:
-        cid = p["channel"]
-        if cid not in grouped_progs:
-            grouped_progs[cid] = []
-        grouped_progs[cid].append(p)
+    with channels_lock:
+        current_channels = list(channels_db)
+        current_programmes = list(epg_programmes)
         
-    for c in channels_db:
+    grouped_progs = {}
+    for p in current_programmes:
+        cid = p.get("channel")
+        if cid:
+            if cid not in grouped_progs:
+                grouped_progs[cid] = []
+            grouped_progs[cid].append(p)
+        
+    for c in current_channels:
         chno = c["GuideNumber"]
         mapped_id = c.get("mapped_epg_id")
         ch_id = mapped_id if mapped_id else chno
@@ -886,7 +904,7 @@ def epg_xml_endpoint():
             
         progs = grouped_progs.get(mapped_id, [])
         if not progs:
-            now = datetime.datetime.now()
+            now = datetime.datetime.now(datetime.timezone.utc)
             start_str = now.strftime("%Y%m%d000000 +0000")
             end_str = (now + datetime.timedelta(days=1)).strftime("%Y%m%d000000 +0000")
             prog_elem = ET.SubElement(root, "programme", {
@@ -900,19 +918,38 @@ def epg_xml_endpoint():
             desc_elem.text = "Programación no disponible para este canal."
         else:
             for p in progs:
+                start_val = p.get("start_time")
+                if isinstance(start_val, (int, float)):
+                    s_dt = datetime.datetime.fromtimestamp(start_val, tz=datetime.timezone.utc)
+                    s_str = s_dt.strftime("%Y%m%d%H%M%S +0000")
+                elif isinstance(start_val, datetime.datetime):
+                    s_str = start_val.strftime("%Y%m%d%H%M%S +0000")
+                else:
+                    s_str = str(start_val)
+                    
+                stop_val = p.get("stop_time") or p.get("end_time")
+                if isinstance(stop_val, (int, float)):
+                    e_dt = datetime.datetime.fromtimestamp(stop_val, tz=datetime.timezone.utc)
+                    e_str = e_dt.strftime("%Y%m%d%H%M%S +0000")
+                elif isinstance(stop_val, datetime.datetime):
+                    e_str = stop_val.strftime("%Y%m%d%H%M%S +0000")
+                else:
+                    e_str = str(stop_val)
+
                 prog_elem = ET.SubElement(root, "programme", {
-                    "start": p["start_time"].strftime("%Y%m%d%H%M%S +0000"),
-                    "stop": p["end_time"].strftime("%Y%m%d%H%M%S +0000"),
+                    "start": s_str,
+                    "stop": e_str,
                     "channel": ch_id
                 })
                 title_elem = ET.SubElement(prog_elem, "title")
-                title_elem.text = p["title"]
-                if p["description"]:
+                title_elem.text = p.get("title", "Unknown")
+                desc_text = p.get("desc") or p.get("description") or ""
+                if desc_text:
                     desc_elem = ET.SubElement(prog_elem, "desc")
-                    desc_elem.text = p["description"]
+                    desc_elem.text = desc_text
                     
-    xmlstr = minidom.parseString(ET.tostring(root, encoding='utf-8')).toprettyxml(indent="  ")
-    return Response(xmlstr, mimetype='application/xml')
+    xml_bytes = ET.tostring(root, encoding='utf-8', xml_declaration=True)
+    return Response(xml_bytes, mimetype='application/xml')
 
 @app.route('/discover.json')
 def hdhr_discover():
@@ -951,8 +988,10 @@ def hdhr_lineup():
     if not config.get("settings", {}).get("hdhr_enabled", False):
         return "HDHomeRun emulator is disabled", 404
         
+    with channels_lock:
+        current_channels = list(channels_db)
     lineup = []
-    for c in channels_db:
+    for c in current_channels:
         lineup.append({
             "GuideNumber": c["GuideNumber"],
             "GuideName": c["GuideName"],
@@ -970,8 +1009,11 @@ def hdhr_lineup_post():
 def scan_adjacent_background(current_chno, scan_interval):
     try:
         config = load_config()
+        with channels_lock:
+            current_channels = list(channels_db)
+            
         current_idx = None
-        for i, c in enumerate(channels_db):
+        for i, c in enumerate(current_channels):
             if c["GuideNumber"] == current_chno:
                 current_idx = i
                 break
@@ -980,9 +1022,9 @@ def scan_adjacent_background(current_chno, scan_interval):
             
         adjacents = []
         if current_idx > 0:
-            adjacents.append(channels_db[current_idx - 1])
-        if current_idx < len(channels_db) - 1:
-            adjacents.append(channels_db[current_idx + 1])
+            adjacents.append(current_channels[current_idx - 1])
+        if current_idx < len(current_channels) - 1:
+            adjacents.append(current_channels[current_idx + 1])
             
         for adj in adjacents:
             adj_chno = adj["GuideNumber"]
@@ -998,7 +1040,7 @@ def scan_adjacent_background(current_chno, scan_interval):
                         has_data = any(aid in all_scans for aid in adj["ace_ids"])
                         if has_data:
                             needs_scan = False
-                except:
+                except (ValueError, TypeError):
                     pass
             
             if needs_scan:
@@ -1009,10 +1051,9 @@ def scan_adjacent_background(current_chno, scan_interval):
 
 @app.route('/auto/v<channel_id>')
 def stream(channel_id):
-    import subprocess
-    import threading
     config = load_config()
-    channel = next((c for c in channels_db if c["GuideNumber"] == channel_id), None)
+    with channels_lock:
+        channel = next((c for c in channels_db if c["GuideNumber"] == channel_id), None)
     if not channel:
         return "Channel not found", 404
         
@@ -1034,7 +1075,7 @@ def stream(channel_id):
                     has_data = any(aid in all_scans for aid in channel["ace_ids"])
                     if has_data:
                         needs_scan = False
-            except:
+            except (ValueError, TypeError):
                 pass
                 
     if settings.get("scan_adjacent_enabled", False):
@@ -1051,7 +1092,8 @@ def stream(channel_id):
                 logging.info(f"Scan on Play triggered for channel {channel_id}")
                 perform_channel_scan(channel_id, limit=3)
                 
-            c = next((ch for ch in channels_db if ch["GuideNumber"] == channel_id), channel)
+            with channels_lock:
+                c = next((ch for ch in channels_db if ch["GuideNumber"] == channel_id), channel)
             
             auto_discard = settings.get("auto_discard_enabled", True)
             timeout = int(settings.get("stream_timeout", 30))
@@ -1105,7 +1147,7 @@ def stream(channel_id):
                 try:
                     ffmpeg_proc.terminate()
                     ffmpeg_proc.wait(timeout=1)
-                except:
+                except (subprocess.TimeoutExpired, OSError):
                     pass
             else:
                 bg_thread.join()
@@ -1130,7 +1172,11 @@ def stream(channel_id):
                             yield chunk
                         else:
                             break
-                    ffmpeg_proc.terminate()
+                    try:
+                        ffmpeg_proc.terminate()
+                        ffmpeg_proc.wait(timeout=1)
+                    except (subprocess.TimeoutExpired, OSError):
+                        pass
         finally:
             with active_clients_lock:
                 active_clients_count -= 1
@@ -1139,11 +1185,10 @@ def stream(channel_id):
                 req.close()
             
     return Response(stream_with_context(stream_generator()), mimetype="video/MP2T")
+
 def perform_channel_scan(chno, limit=None):
-    global channels_db
-    import subprocess
-    import json
-    channel = next((c for c in channels_db if c["GuideNumber"] == chno), None)
+    with channels_lock:
+        channel = next((c for c in channels_db if c["GuideNumber"] == chno), None)
     if not channel:
         return {"error": "Channel not found"}
         
@@ -1264,8 +1309,11 @@ def test_channel(chno):
         return jsonify(result), 404
     return jsonify(result)
 
+# Initialize database and scheduler on application load (supports Gunicorn and direct python execution)
+db.init_db()
+init_scheduler()
+
 if __name__ == '__main__':
-    db.init_db()
-    init_scheduler()
     web_port = int(os.environ.get('WEB_PORT', 5004))
     app.run(host='0.0.0.0', port=web_port)
+
