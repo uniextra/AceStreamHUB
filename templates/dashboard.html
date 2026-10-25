@@ -50,6 +50,41 @@
     </div>
 </section>
 
+<!-- Canales en Reproducción Activa -->
+<section class="mb-lg">
+    <div class="glass-panel rounded-xl p-md flex flex-col relative overflow-hidden">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 border-b border-white/5 pb-3">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-primary-fixed-dim text-2xl">sensors</span>
+                <div>
+                    <h2 class="font-headline-md text-lg md:text-xl text-on-surface font-semibold flex items-center gap-2">
+                        {{ _('Canales en Reproducción Activa') }}
+                        <span id="active_channels_badge" class="hidden text-xs bg-primary-container/20 text-primary-fixed border border-primary-container/30 px-2.5 py-0.5 rounded-full font-mono font-bold">0</span>
+                    </h2>
+                    <p class="text-xs text-on-surface-variant">{{ _('Monitor en tiempo real de streams P2P, tasa de bits y clientes conectados por canal.') }}</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 bg-surface-container-low px-3 py-1 rounded-full border border-white/5 text-xs text-on-surface-variant font-mono">
+                <span id="p2p_dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                <span id="p2p_label">HUB IDLE</span>
+            </div>
+        </div>
+
+        <!-- Dynamic Container for Active Channels -->
+        <div id="active_channels_container">
+            <!-- Empty state -->
+            <div id="no_active_channels" class="text-center py-8 px-4 bg-surface-container-low/50 rounded-xl border border-white/5">
+                <span class="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-2">tv_off</span>
+                <p class="text-on-surface-variant text-sm max-w-md mx-auto">
+                    {{ _('No hay canales en reproducción activa. Al sintonizar desde un cliente IPTV aparecerá aquí el estado en tiempo real.') }}
+                </p>
+            </div>
+            <!-- Channels List -->
+            <div id="active_channels_list" class="space-y-4"></div>
+        </div>
+    </div>
+</section>
+
 <!-- Quick Actions -->
 <section class="mb-lg">
     <div class="glass-panel rounded-xl p-md md:col-span-2 flex flex-col justify-center relative overflow-hidden">
@@ -120,7 +155,182 @@ function copyUrl(urlId, copyIconId, checkIconId) {
     }
 }
 
-setInterval(async () => {
+function formatDuration(sec) {
+    if (!sec || sec < 0) return '0s';
+    if (sec < 60) return `${sec}s`;
+    const mins = Math.floor(sec / 60);
+    const rem = sec % 60;
+    if (mins < 60) return `${mins}m ${rem}s`;
+    const hrs = Math.floor(mins / 60);
+    return `${hrs}h ${mins % 60}m`;
+}
+
+function renderActiveChannels(channels) {
+    const listContainer = document.getElementById('active_channels_list');
+    const emptyState = document.getElementById('no_active_channels');
+    const badge = document.getElementById('active_channels_badge');
+    const p2pDot = document.getElementById('p2p_dot');
+    const p2pLabel = document.getElementById('p2p_label');
+    
+    if (!channels || channels.length === 0) {
+        if (emptyState) emptyState.classList.remove('hidden');
+        if (listContainer) listContainer.innerHTML = '';
+        if (badge) badge.classList.add('hidden');
+        if (p2pDot) {
+            p2pDot.className = 'w-2 h-2 rounded-full bg-slate-500';
+        }
+        if (p2pLabel) p2pLabel.innerText = 'HUB IDLE';
+        return;
+    }
+    
+    if (emptyState) emptyState.classList.add('hidden');
+    if (badge) {
+        badge.classList.remove('hidden');
+        badge.innerText = channels.length;
+    }
+    if (p2pDot) {
+        p2pDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]';
+    }
+    if (p2pLabel) p2pLabel.innerText = 'STREAMING';
+
+    const currentChannelIds = new Set(channels.map(c => String(c.channel_id)));
+
+    // Remove cards that are no longer active
+    const existingCards = listContainer.querySelectorAll('[data-channel-card]');
+    existingCards.forEach(card => {
+        const id = card.getAttribute('data-channel-card');
+        if (!currentChannelIds.has(id)) {
+            card.remove();
+        }
+    });
+
+    channels.forEach(ch => {
+        const chId = String(ch.channel_id);
+        const speedText = ch.kbps > 0 ? `${(ch.kbps / 1000).toFixed(1)} Mbps` : '';
+        const viewersText = ch.clients_count === 1 ? `1 {{ _('cliente viendo') }}` : `${ch.clients_count} {{ _('clientes viendo') }}`;
+        const totalMbText = `${ch.total_mb || 0} MB`;
+        const uptimeText = formatDuration(ch.uptime_seconds);
+        const statusLabel = ch.status || 'DIRECTO (Pass-Through)';
+        const peersCount = ch.peers || 0;
+        const peersLabel = peersCount > 0 ? `${peersCount} peers` : 'Buscando peers...';
+        
+        let card = listContainer.querySelector(`[data-channel-card="${chId}"]`);
+        
+        const clientsHtml = (ch.clients && ch.clients.length > 0) ? ch.clients.map(cl => `
+            <span class="inline-flex items-center gap-1.5 bg-surface-container-high px-2.5 py-1 rounded-md border border-white/5 text-[11px] font-mono text-on-surface" title="${cl.user_agent || ''}">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span class="font-semibold">${cl.ip}</span>
+                <span class="text-on-surface-variant/70">(${formatDuration(cl.connected_seconds)})</span>
+            </span>
+        `).join('') : '<span class="text-xs text-on-surface-variant/50">--</span>';
+
+        if (!card) {
+            card = document.createElement('div');
+            card.setAttribute('data-channel-card', chId);
+            card.className = "bg-surface-container-low/90 border border-white/10 rounded-xl p-4 md:p-5 transition-all duration-300 relative overflow-hidden";
+            card.innerHTML = `
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono text-sm font-bold bg-primary-container/20 text-primary-fixed border border-primary-container/30 px-3 py-1 rounded-lg">
+                            ${ch.channel_id}
+                        </span>
+                        <div>
+                            <h3 class="font-semibold text-on-surface text-base md:text-lg flex items-center gap-2">
+                                ${ch.channel_name}
+                            </h3>
+                            <span class="text-xs font-mono text-on-surface-variant/70 channel-aceid">
+                                ID: ${ch.ace_id ? ch.ace_id.substring(0, 14) + '...' : 'P2P'}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <div class="channel-peers text-xs font-mono bg-surface-container-highest px-2.5 py-1 rounded-lg border border-white/5 flex items-center gap-1.5 ${peersCount > 0 ? 'text-emerald-400' : 'text-amber-400/80'}">
+                            <span class="peers-dot w-1.5 h-1.5 rounded-full ${peersCount > 0 ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'bg-amber-400 animate-pulse'}"></span>
+                            <span class="material-symbols-outlined text-[14px]">hub</span>
+                            <span class="peers-val font-semibold">${peersLabel}</span>
+                        </div>
+
+                        <div class="channel-speed text-xs font-mono bg-surface-container-highest px-2.5 py-1 rounded-lg text-primary-fixed border border-white/5 flex items-center gap-1 ${speedText ? '' : 'hidden'}">
+                            <span class="material-symbols-outlined text-[14px]">speed</span>
+                            <span class="speed-val">${speedText}</span>
+                        </div>
+
+                        <div class="channel-total text-xs font-mono bg-surface-container-highest px-2.5 py-1 rounded-lg text-on-surface-variant border border-white/5 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[14px]">data_usage</span>
+                            <span class="total-val">${totalMbText}</span>
+                        </div>
+
+                        <div class="channel-uptime text-xs font-mono bg-surface-container-highest px-2.5 py-1 rounded-lg text-on-surface-variant border border-white/5 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[14px]">schedule</span>
+                            <span class="uptime-val">${uptimeText}</span>
+                        </div>
+                        
+                        <div class="text-xs font-mono bg-surface-container-highest px-2.5 py-1 rounded-lg text-secondary-fixed border border-white/5 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[14px]">group</span>
+                            <span class="viewers-val">${viewersText}</span>
+                        </div>
+
+                        <div class="channel-status-pill text-xs font-mono px-2.5 py-1 rounded-lg border flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+                            <span class="status-dot w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span class="status-text">${statusLabel}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-white/5 flex flex-wrap items-center gap-2">
+                    <span class="text-[11px] uppercase tracking-wider text-on-surface-variant/60 font-mono">Clientes:</span>
+                    <div class="clients-container flex flex-wrap items-center gap-1.5">
+                        ${clientsHtml}
+                    </div>
+                </div>
+            `;
+            listContainer.appendChild(card);
+        } else {
+            // Update existing card smoothly in-place
+            const aceIdEl = card.querySelector('.channel-aceid');
+            if (aceIdEl) aceIdEl.innerText = 'ID: ' + (ch.ace_id ? ch.ace_id.substring(0, 14) + '...' : 'P2P');
+
+            const peersBadge = card.querySelector('.channel-peers');
+            const peersDot = card.querySelector('.peers-dot');
+            const peersVal = card.querySelector('.peers-val');
+            if (peersBadge && peersDot && peersVal) {
+                const pCount = ch.peers || 0;
+                peersBadge.className = `channel-peers text-xs font-mono bg-surface-container-highest px-2.5 py-1 rounded-lg border border-white/5 flex items-center gap-1.5 ${pCount > 0 ? 'text-emerald-400' : 'text-amber-400/80'}`;
+                peersDot.className = `peers-dot w-1.5 h-1.5 rounded-full ${pCount > 0 ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'bg-amber-400 animate-pulse'}`;
+                peersVal.innerText = pCount > 0 ? `${pCount} peers` : 'Buscando peers...';
+            }
+
+            const speedEl = card.querySelector('.channel-speed');
+            const speedVal = card.querySelector('.speed-val');
+            if (speedEl && speedVal) {
+                if (speedText) {
+                    speedEl.classList.remove('hidden');
+                    speedVal.innerText = speedText;
+                } else {
+                    speedEl.classList.add('hidden');
+                }
+            }
+
+            const totalVal = card.querySelector('.total-val');
+            if (totalVal) totalVal.innerText = totalMbText;
+
+            const uptimeVal = card.querySelector('.uptime-val');
+            if (uptimeVal) uptimeVal.innerText = uptimeText;
+
+            const viewersVal = card.querySelector('.viewers-val');
+            if (viewersVal) viewersVal.innerText = viewersText;
+
+            const statusTxt = card.querySelector('.status-text');
+            if (statusTxt) statusTxt.innerText = statusLabel;
+
+            const clientsBox = card.querySelector('.clients-container');
+            if (clientsBox) clientsBox.innerHTML = clientsHtml;
+        }
+    });
+}
+
+async function fetchStats() {
     try {
         const res = await fetch('/api/stats');
         if (res.ok) {
@@ -129,10 +339,15 @@ setInterval(async () => {
             if (counter && data.active_clients !== undefined) {
                 counter.innerText = data.active_clients;
             }
+            renderActiveChannels(data.channels || []);
         }
     } catch (err) {
         console.error('Error fetching stats:', err);
     }
-}, 5000);
+}
+
+// Initial fetch and poll every 2.5 seconds
+fetchStats();
+setInterval(fetchStats, 2500);
 </script>
 {% endblock %}

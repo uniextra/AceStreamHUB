@@ -51,6 +51,7 @@ CONFIG_FILE = os.path.join(DATA_DIR, 'config.json')
 config_lock = threading.Lock()
 channels_lock = threading.RLock()
 active_clients_lock = threading.Lock()
+active_streams_lock = threading.Lock()
 
 # Global Data structures
 raw_sources_db = {} # source_id -> list of channels
@@ -60,6 +61,7 @@ epg_channels = [] # global list of all mapped channels
 channels_db = [] # final list of unified channels
 
 active_clients_count = 0
+active_streams = {} # channel_id -> dict with telemetry and clients map
 
 scheduler = BackgroundScheduler()
 
@@ -577,23 +579,117 @@ def index():
 @app.route('/dashboard')
 def dashboard():
     config = load_config()
-    total_streams = sum(len(c["ace_ids"]) for c in channels_db)
+    with channels_lock:
+        total_channels = len(channels_db)
+        total_streams = sum(len(c["ace_ids"]) for c in channels_db)
     
+    with active_streams_lock:
+        total_clients = sum(len(ch.get("clients", {})) for ch in active_streams.values())
+        
     with active_clients_lock:
-        active_clients = active_clients_count
+        global active_clients_count
+        active_clients_count = total_clients
         
     return render_template('dashboard.html', 
-                          channels=len(channels_db), 
+                          channels=total_channels, 
                           sources=len(config.get("sources", [])),
                           streams=total_streams,
-                          active_clients=active_clients,
+                          active_clients=total_clients,
                           settings=config.get("settings", {}))
+
+peers_cache = {} # ace_id -> (timestamp, peer_count)
+peers_cache_lock = threading.Lock()
+
+def fetch_channel_peers(ace_id: str) -> int:
+    if not ace_id:
+        return 0
+        
+    now = time.time()
+    with peers_cache_lock:
+        if ace_id in peers_cache:
+            cached_time, cached_peers = peers_cache[ace_id]
+            if now - cached_time < 2.5:
+                return cached_peers
+                
+    proxy_url = os.environ.get('ACESTREAM_URL', 'http://acexy:8080')
+    engine_url = os.environ.get('ENGINE_URL', 'http://acestream-engine:6878')
+    
+    endpoints = [
+        f"{proxy_url}/ace/stat?id={ace_id}",
+        f"{engine_url}/ace/stat?id={ace_id}",
+        f"{engine_url}/stat/{ace_id}",
+        f"{proxy_url}/stat/{ace_id}"
+    ]
+    
+    peers = None
+    for url in endpoints:
+        try:
+            r = requests.get(url, timeout=1.0)
+            if r.status_code == 200:
+                data = r.json()
+                if isinstance(data, dict):
+                    if "response" in data and isinstance(data["response"], dict):
+                        peers = data["response"].get("peers")
+                    elif "peers" in data:
+                        peers = data.get("peers")
+                if peers is not None:
+                    peers = int(peers)
+                    break
+        except Exception:
+            continue
+            
+    with peers_cache_lock:
+        if peers is not None:
+            peers_cache[ace_id] = (now, peers)
+            return peers
+        else:
+            old_peers = peers_cache.get(ace_id, (now, 0))[1]
+            peers_cache[ace_id] = (now, old_peers)
+            return old_peers
 
 @app.route('/api/stats')
 def api_stats():
+    channels_telemetry = []
+    total_clients = 0
+    now = time.time()
+    
+    with active_streams_lock:
+        for ch_id, ch_info in list(active_streams.items()):
+            clients_list = []
+            for cid, c_meta in ch_info.get("clients", {}).items():
+                clients_list.append({
+                    "id": cid,
+                    "ip": c_meta.get("ip", "unknown"),
+                    "user_agent": c_meta.get("user_agent", "unknown"),
+                    "connected_seconds": int(now - c_meta.get("connected_since", now))
+                })
+            total_clients += len(clients_list)
+            
+            ace_id = ch_info.get("ace_id", "")
+            peers_count = fetch_channel_peers(ace_id) if ace_id else 0
+            
+            channels_telemetry.append({
+                "channel_id": ch_id,
+                "channel_name": ch_info.get("channel_name", f"Channel {ch_id}"),
+                "ace_id": ace_id,
+                "peers": peers_count,
+                "status": ch_info.get("status", "DIRECTO (Pass-Through)"),
+                "kbps": ch_info.get("kbps", 0),
+                "total_mb": round(ch_info.get("total_bytes", 0) / (1024 * 1024), 1),
+                "clients_count": len(clients_list),
+                "clients": clients_list,
+                "uptime_seconds": int(now - ch_info.get("started_at", now))
+            })
+            
     with active_clients_lock:
-        active_clients = active_clients_count
-    return jsonify({"active_clients": active_clients})
+        global active_clients_count
+        active_clients_count = total_clients
+        
+    return jsonify({
+        "active_clients": total_clients,
+        "total_active_channels": len(channels_telemetry),
+        "channels": channels_telemetry
+    })
 
 @app.route('/sources', methods=['GET'])
 def sources():
@@ -709,8 +805,6 @@ def save_settings_api():
         config["settings"]["scan_on_play_enabled"] = data["scan_on_play_enabled"]
     if "placeholder_enabled" in data:
         config["settings"]["placeholder_enabled"] = data["placeholder_enabled"]
-    if "scan_adjacent_enabled" in data:
-        config["settings"]["scan_adjacent_enabled"] = data["scan_adjacent_enabled"]
     if "scan_on_play_interval_minutes" in data:
         config["settings"]["scan_on_play_interval_minutes"] = data["scan_on_play_interval_minutes"]
     if "language" in data:
@@ -723,14 +817,16 @@ def save_settings_api():
         config["settings"]["engine_live_buffer"] = data["engine_live_buffer"]
     if "engine_disk_cache" in data:
         config["settings"]["engine_disk_cache"] = data["engine_disk_cache"]
-    if "server_ram_buffer_mb" in data:
-        config["settings"]["server_ram_buffer_mb"] = data["server_ram_buffer_mb"]
+        
+    # Clean up obsolete settings
+    config["settings"].pop("scan_adjacent_enabled", None)
+    config["settings"].pop("server_ram_buffer_mb", None)
         
     save_config(config)
     
     # Generate engine_args.txt for acestream-engine container
     try:
-        buffer = config["settings"].get("engine_live_buffer", 10)
+        buffer = config["settings"].get("engine_live_buffer", 15)
         cache = config["settings"].get("engine_disk_cache", 0)
         
         args = f"--live-buffer {buffer}"
@@ -1009,49 +1105,6 @@ def hdhr_lineup_post():
         return "HDHomeRun emulator is disabled", 404
     return ""
 
-def scan_adjacent_background(current_chno, scan_interval):
-    try:
-        config = load_config()
-        with channels_lock:
-            current_channels = list(channels_db)
-            
-        current_idx = None
-        for i, c in enumerate(current_channels):
-            if c["GuideNumber"] == current_chno:
-                current_idx = i
-                break
-        if current_idx is None:
-            return
-            
-        adjacents = []
-        if current_idx > 0:
-            adjacents.append(current_channels[current_idx - 1])
-        if current_idx < len(current_channels) - 1:
-            adjacents.append(current_channels[current_idx + 1])
-            
-        for adj in adjacents:
-            adj_chno = adj["GuideNumber"]
-            last_scans = config.get("last_scans", {})
-            last_scan_str = last_scans.get(adj_chno)
-            needs_scan = True
-            
-            if last_scan_str:
-                try:
-                    last_scan_time = datetime.datetime.strptime(last_scan_str, "%Y-%m-%d %H:%M:%S")
-                    if (datetime.datetime.now() - last_scan_time).total_seconds() / 60 < scan_interval:
-                        all_scans = db.get_all_scans()
-                        has_data = any(aid in all_scans for aid in adj["ace_ids"])
-                        if has_data:
-                            needs_scan = False
-                except (ValueError, TypeError):
-                    pass
-            
-            if needs_scan:
-                logging.info(f"Background scanning adjacent channel {adj_chno} ({adj['GuideName']})")
-                perform_channel_scan(adj_chno, limit=3)
-    except Exception as e:
-        logging.error(f"Error in background adjacent scan: {e}")
-
 @app.route('/auto/v<channel_id>')
 def stream(channel_id):
     config = load_config()
@@ -1060,210 +1113,117 @@ def stream(channel_id):
     if not channel:
         return "Channel not found", 404
         
-    settings = config.get("settings", {})
-    scan_enabled = settings.get("scan_on_play_enabled", False)
-    scan_interval = settings.get("scan_on_play_interval_minutes", 60)
-    # Forced False: raw MPEG-TS concatenation breaks PCR/PTS clock and drops audio in VLC/TVs
-    placeholder_enabled = False
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr or '127.0.0.1')
+    if ',' in client_ip:
+        client_ip = client_ip.split(',')[0].strip()
+    user_agent = request.headers.get('User-Agent', 'Unknown Player')
+    client_id = f"{client_ip}_{uuid.uuid4().hex[:6]}"
     
-    needs_scan = False
-    if scan_enabled:
-        last_scans = config.get("last_scans", {})
-        last_scan_str = last_scans.get(channel_id)
-        needs_scan = True
-        if last_scan_str:
-            try:
-                last_scan_time = datetime.datetime.strptime(last_scan_str, "%Y-%m-%d %H:%M:%S")
-                if (datetime.datetime.now() - last_scan_time).total_seconds() / 60 < scan_interval:
-                    all_scans = db.get_all_scans()
-                    has_data = any(aid in all_scans for aid in channel["ace_ids"])
-                    if has_data:
-                        needs_scan = False
-            except (ValueError, TypeError):
-                pass
-                
-    if settings.get("scan_adjacent_enabled", False):
-        scheduler.add_job(scan_adjacent_background, args=[channel_id, scan_interval])
+    settings = config.get("settings", {})
+    auto_discard = settings.get("auto_discard_enabled", True)
+    timeout = int(settings.get("stream_timeout", 30))
+    proxy_url = os.environ.get('ACESTREAM_URL', 'http://acexy:8080')
+    
+    valid_ace_ids = list(channel.get("ace_ids", []))
+    if auto_discard:
+        all_scans = db.get_all_scans()
+        filtered_ids = [aid for aid in valid_ace_ids if all_scans.get(aid, {}).get("consecutive_fails", 0) < 3]
+        if filtered_ids:
+            valid_ace_ids = filtered_ids
+            
+    req = None
+    connected_ace_id = None
+    for ace_id in valid_ace_ids:
+        stream_url = f"{proxy_url}/ace/getstream?id={ace_id}"
+        logging.info(f"Connecting channel {channel_id} ({channel.get('GuideName')}) from {stream_url} (timeout={timeout}s)")
+        try:
+            r = requests.get(stream_url, stream=True, timeout=timeout)
+            if r.status_code == 200:
+                req = r
+                connected_ace_id = ace_id
+                break
+            else:
+                logging.warning(f"Fallback: {stream_url} returned HTTP {r.status_code}")
+        except Exception as e:
+            logging.error(f"Fallback: failed to connect to {stream_url}: {e}")
+            continue
+            
+    if not req:
+        logging.error(f"All sources for channel {channel_id} failed!")
+        return "Channel stream unavailable: all sources failed", 503
+        
+    with active_streams_lock:
+        if channel_id not in active_streams:
+            active_streams[channel_id] = {
+                "channel_id": channel_id,
+                "channel_name": channel.get("GuideName", f"Channel {channel_id}"),
+                "ace_id": connected_ace_id,
+                "started_at": time.time(),
+                "total_bytes": 0,
+                "kbps": 0,
+                "status": "DIRECTO (Pass-Through)",
+                "clients": {}
+            }
+        active_streams[channel_id]["clients"][client_id] = {
+            "ip": client_ip,
+            "user_agent": user_agent,
+            "connected_since": time.time()
+        }
         
     def stream_generator():
         global active_clients_count
         with active_clients_lock:
             active_clients_count += 1
             
-        connect_results = {}
-        def background_task():
-            if scan_enabled and needs_scan:
-                logging.info(f"Scan on Play triggered for channel {channel_id}")
-                perform_channel_scan(channel_id, limit=3)
-                
-            with channels_lock:
-                c = next((ch for ch in channels_db if ch["GuideNumber"] == channel_id), channel)
-            
-            auto_discard = settings.get("auto_discard_enabled", True)
-            timeout = int(settings.get("stream_timeout", 30))
-            
-            valid_ace_ids = c["ace_ids"]
-            if auto_discard:
-                all_scans = db.get_all_scans()
-                filtered_ids = [aid for aid in valid_ace_ids if all_scans.get(aid, {}).get("consecutive_fails", 0) < 3]
-                if filtered_ids:
-                    valid_ace_ids = filtered_ids
-                    
-            for ace_id in valid_ace_ids:
-                proxy_url = os.environ.get('ACESTREAM_URL', 'http://acexy:8080')
-                stream_url = f"{proxy_url}/ace/getstream?id={ace_id}"
-                logging.info(f"Attempting to proxy channel {channel_id} from {stream_url} with timeout {timeout}s")
-                try:
-                    req = requests.get(stream_url, stream=True, timeout=timeout)
-                    if req.status_code == 200:
-                        connect_results['req'] = req
-                        return
-                    else:
-                        logging.warning(f"Fallback: {stream_url} returned {req.status_code}")
-                except Exception as e:
-                    logging.error(f"Fallback: failed to connect to {stream_url}: {e}")
-                    continue
-            connect_results['req'] = None
-
-        bg_thread = threading.Thread(target=background_task)
-        bg_thread.start()
-        
-        config = load_config()
-        lang = config.get("settings", {}).get("language", "es")
-        text_loading = translations.gettext("Cargando...", lang)
+        speed_bytes = 0
+        speed_start = time.time()
+        chunk_size = 128 * 1024
         
         try:
-            if placeholder_enabled:
-                cmd = [
-                    'ffmpeg', '-f', 'lavfi', '-re', '-i', 'color=c=#1b1a2f:s=1280x720:r=25',
-                    '-ignore_loop', '0', '-i', 'assets/loading.gif',
-                    '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
-                    '-filter_complex', f"[1:v]scale=250:-1[spinner];[0:v][spinner]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2+80[bg];[bg]drawtext=text='AceStream Hub - {text_loading}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=(h-text_h)/2-80",
-                    '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-b:v', '500k',
-                    '-c:a', 'aac', '-b:a', '128k',
-                    '-f', 'mpegts', 'pipe:1'
-                ]
-                ffmpeg_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            for chunk in req.iter_content(chunk_size=chunk_size):
+                if not chunk:
+                    continue
+                now = time.time()
+                chunk_len = len(chunk)
+                speed_bytes += chunk_len
                 
-                while bg_thread.is_alive():
-                    chunk = ffmpeg_proc.stdout.read(65536)
-                    if chunk:
-                        yield chunk
-                    else:
-                        break
-                try:
-                    ffmpeg_proc.terminate()
-                    ffmpeg_proc.wait(timeout=1)
-                except (subprocess.TimeoutExpired, OSError):
-                    pass
-            else:
-                bg_thread.join()
-                
-            req = connect_results.get('req')
-            if req:
-                ram_buffer_mb = int(settings.get("server_ram_buffer_mb", 4))
-                if ram_buffer_mb > 0:
-                    chunk_size = 64 * 1024
-                    max_chunks = max(32, int(((ram_buffer_mb + 2) * 1024 * 1024) / chunk_size))
-                    target_prebuffer_bytes = ram_buffer_mb * 1024 * 1024
-                    
-                    stream_queue = queue.Queue(maxsize=max_chunks)
-                    stop_event = threading.Event()
-                    
-                    def producer():
-                        try:
-                            for chunk in req.iter_content(chunk_size=chunk_size):
-                                if stop_event.is_set():
-                                    break
-                                if chunk:
-                                    while not stop_event.is_set():
-                                        try:
-                                            stream_queue.put(chunk, timeout=0.5)
-                                            break
-                                        except queue.Full:
-                                            continue
-                        except Exception as pe:
-                            logging.warning(f"RAM Buffer producer ended: {pe}")
-                        finally:
-                            stream_queue.put(None)
+                if now - speed_start >= 1.0:
+                    current_kbps = int((speed_bytes * 8) / (1024 * (now - speed_start)))
+                    speed_bytes = 0
+                    speed_start = now
+                    with active_streams_lock:
+                        if channel_id in active_streams:
+                            active_streams[channel_id]["kbps"] = current_kbps
                             
-                    prod_thread = threading.Thread(target=producer, daemon=True)
-                    prod_thread.start()
-                    
-                    # Pre-buffering phase (accumulate in RAM up to target_bytes or 3.5s timeout)
-                    buffered_bytes = 0
-                    prebuffer_start = time.time()
-                    prebuffer_chunks = []
-                    
-                    while time.time() - prebuffer_start < 3.5 and buffered_bytes < target_prebuffer_bytes and not stop_event.is_set():
-                        try:
-                            item = stream_queue.get(timeout=0.1)
-                            if item is None:
-                                prebuffer_chunks.append(None)
-                                break
-                            prebuffer_chunks.append(item)
-                            buffered_bytes += len(item)
-                        except queue.Empty:
-                            continue
-                            
-                    logging.info(f"RAM Buffer pre-filled {buffered_bytes / (1024*1024):.2f} MB in {time.time() - prebuffer_start:.2f}s for channel {channel_id}")
-                    
-                    try:
-                        # Flush pre-buffered chunks immediately (burst to client)
-                        for item in prebuffer_chunks:
-                            if item is None:
-                                return
-                            yield item
-                            
-                        # Stream live chunks as they arrive from queue
-                        while not stop_event.is_set():
-                            try:
-                                item = stream_queue.get(timeout=10)
-                                if item is None:
-                                    break
-                                yield item
-                            except queue.Empty:
-                                logging.warning(f"RAM Buffer starved on channel {channel_id}")
-                                break
-                    finally:
-                        stop_event.set()
-                else:
-                    yield from req.iter_content(chunk_size=1024 * 1024)
-            else:
-                logging.error(f"All sources for channel {channel_id} failed!")
-                text_error = translations.gettext("ERROR", lang)
-                text_failed = translations.gettext("Todos los origenes fallaron", lang)
-                if placeholder_enabled:
-                    cmd = [
-                        'ffmpeg', '-f', 'lavfi', '-re', '-i', 'color=c=#1b0000:s=1280x720:d=10:r=25',
-                        '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
-                        '-vf', f"drawtext=text='AceStream Hub - {text_error}':fontcolor=#ff6b6b:fontsize=48:x=(w-text_w)/2:y=(h-text_h)/2,drawtext=text='{text_failed}':fontcolor=white:fontsize=32:x=(w-text_w)/2:y=(h-text_h)/2+80",
-                        '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-b:v', '500k',
-                        '-c:a', 'aac', '-b:a', '128k',
-                        '-f', 'mpegts', 'pipe:1'
-                    ]
-                    ffmpeg_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-                    while True:
-                        chunk = ffmpeg_proc.stdout.read(65536)
-                        if chunk:
-                            yield chunk
-                        else:
-                            break
-                    try:
-                        ffmpeg_proc.terminate()
-                        ffmpeg_proc.wait(timeout=1)
-                    except (subprocess.TimeoutExpired, OSError):
-                        pass
+                with active_streams_lock:
+                    if channel_id in active_streams:
+                        active_streams[channel_id]["total_bytes"] += chunk_len
+                        
+                yield chunk
         finally:
+            with active_streams_lock:
+                if channel_id in active_streams:
+                    if client_id in active_streams[channel_id]["clients"]:
+                        del active_streams[channel_id]["clients"][client_id]
+                    if not active_streams[channel_id]["clients"]:
+                        del active_streams[channel_id]
+                        
             with active_clients_lock:
-                active_clients_count -= 1
-            req = connect_results.get('req')
-            if req:
+                active_clients_count = max(0, active_clients_count - 1)
+                
+            try:
                 req.close()
-            
+            except Exception:
+                pass
+                
     return Response(stream_with_context(stream_generator()), mimetype="video/mp2t")
 
 def perform_channel_scan(chno, limit=None):
+    with active_streams_lock:
+        if len(active_streams) > 0 and str(chno) not in active_streams:
+            logging.info(f"Skipping channel scan for {chno}: active playback is in progress on channel(s) {list(active_streams.keys())}")
+            return {"error": "Skipped due to active playback"}
+            
     with channels_lock:
         channel = next((c for c in channels_db if c["GuideNumber"] == chno), None)
     if not channel:

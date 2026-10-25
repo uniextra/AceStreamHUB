@@ -20,3 +20,6 @@ engine_args.txt
 *.txt
 test_*.py
 
+
+.agent/
+config/cache_*.json

@@ -129,11 +129,21 @@ translations = {
         "orígenes": "sources",
         "Sin coincidencia EPG": "No EPG Match",
         "Búfer en RAM del Servidor": "Server RAM Buffer",
-        "Almacena unos segundos de vídeo en la memoria RAM del servidor antes y durante la emisión para absorber fluctuaciones de red y evitar cortes en apps de Smart TV. Cero escrituras en SSD.": "Stores a few seconds of video in server RAM before and during playback to absorb network jitter and prevent stuttering on Smart TV apps. Zero SSD writes.",
-        "Desactivado (Directo)": "Disabled (Direct)",
-        "2 MB (~2-3 seg)": "2 MB (~2-3 sec)",
-        "4 MB (~4-5 seg, Recomendado)": "4 MB (~4-5 sec, Recommended)",
-        "8 MB (~8-10 seg, Conexiones lentas)": "8 MB (~8-10 sec, Slow connections)"
+        "Canales en Reproducción Activa": "Active Playing Channels",
+        "Monitor en tiempo real de streams P2P, tasa de bits y clientes conectados por canal.": "Real-time monitor of P2P streams, bitrate, and connected clients per channel.",
+        "No hay canales en reproducción activa. Al sintonizar desde un cliente IPTV aparecerá aquí el estado en tiempo real.": "No channels currently playing. When tuning from an IPTV client, live stream status will appear here.",
+        "Canales en Reproducción y Búfer en Vivo": "Live Playing Channels & Buffer",
+        "Monitor en tiempo real de la memoria intermedia y clientes conectados por canal.": "Real-time monitor of RAM buffer and connected clients per channel.",
+        "No hay canales en reproducción activa. Al sintonizar desde un cliente IPTV aparecerá aquí el estado del búfer en tiempo real.": "No channels currently playing. When tuning from an IPTV client, live buffer status will appear here.",
+        "cliente": "client",
+        "clientes": "clients",
+        "cliente viendo": "client viewing",
+        "clientes viendo": "clients viewing",
+        "Saludable": "Healthy",
+        "Atención": "Warning",
+        "Recuperando búfer P2P...": "Recovering P2P buffer...",
+        "Cargando P2P...": "Loading P2P...",
+        "Buscando peers...": "Searching peers..."
     }
 }
 
