@@ -1060,7 +1060,8 @@ def stream(channel_id):
     settings = config.get("settings", {})
     scan_enabled = settings.get("scan_on_play_enabled", False)
     scan_interval = settings.get("scan_on_play_interval_minutes", 60)
-    placeholder_enabled = settings.get("placeholder_enabled", False)
+    # Forced False: raw MPEG-TS concatenation breaks PCR/PTS clock and drops audio in VLC/TVs
+    placeholder_enabled = False
     
     needs_scan = False
     if scan_enabled:
@@ -1190,7 +1191,7 @@ def stream(channel_id):
             if req:
                 req.close()
             
-    return Response(stream_with_context(stream_generator()), mimetype="video/MP2T")
+    return Response(stream_with_context(stream_generator()), mimetype="video/mp2t")
 
 def perform_channel_scan(chno, limit=None):
     with channels_lock:
