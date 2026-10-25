@@ -826,7 +826,7 @@ def save_settings_api():
     
     # Generate engine_args.txt for acestream-engine container
     try:
-        buffer = config["settings"].get("engine_live_buffer", 15)
+        buffer = config["settings"].get("engine_live_buffer", 5)
         cache = config["settings"].get("engine_disk_cache", 0)
         
         args = f"--live-buffer {buffer}"

@@ -3,6 +3,7 @@ services:
     image: vstavrinov/acestream-engine:latest
     container_name: acestream-engine
     restart: unless-stopped
+    shm_size: "1gb"
     ports:
       - "6878:6878"
       - "8621:8621"
@@ -22,6 +23,10 @@ services:
       ACEXY_SCHEME: "http"
       ACEXY_HOST: "acestream-engine"
       ACEXY_PORT: "6878"
+      ACEXY_NO_RESPONSE_TIMEOUT: "30s"
+      ACEXY_CLIENT_EVICTION_TIMEOUT: "30s"
+      ACEXY_EMPTY_TIMEOUT: "60s"
+      ACEXY_BUFFER_SIZE: "8MB"
     depends_on:
       - acestream-engine
 
