@@ -1060,7 +1060,7 @@ def stream(channel_id):
     settings = config.get("settings", {})
     scan_enabled = settings.get("scan_on_play_enabled", False)
     scan_interval = settings.get("scan_on_play_interval_minutes", 60)
-    placeholder_enabled = settings.get("placeholder_enabled", True)
+    placeholder_enabled = settings.get("placeholder_enabled", False)
     
     needs_scan = False
     if scan_enabled:
@@ -1133,8 +1133,11 @@ def stream(channel_id):
                 cmd = [
                     'ffmpeg', '-f', 'lavfi', '-re', '-i', 'color=c=#1b1a2f:s=1280x720:r=25',
                     '-ignore_loop', '0', '-i', 'assets/loading.gif',
+                    '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
                     '-filter_complex', f"[1:v]scale=250:-1[spinner];[0:v][spinner]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2+80[bg];[bg]drawtext=text='AceStream Hub - {text_loading}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=(h-text_h)/2-80",
-                    '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-b:v', '500k', '-f', 'mpegts', 'pipe:1'
+                    '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-b:v', '500k',
+                    '-c:a', 'aac', '-b:a', '128k',
+                    '-f', 'mpegts', 'pipe:1'
                 ]
                 ffmpeg_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
                 
@@ -1162,8 +1165,11 @@ def stream(channel_id):
                 if placeholder_enabled:
                     cmd = [
                         'ffmpeg', '-f', 'lavfi', '-re', '-i', 'color=c=#1b0000:s=1280x720:d=10:r=25',
+                        '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
                         '-vf', f"drawtext=text='AceStream Hub - {text_error}':fontcolor=#ff6b6b:fontsize=48:x=(w-text_w)/2:y=(h-text_h)/2,drawtext=text='{text_failed}':fontcolor=white:fontsize=32:x=(w-text_w)/2:y=(h-text_h)/2+80",
-                        '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-b:v', '500k', '-f', 'mpegts', 'pipe:1'
+                        '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-b:v', '500k',
+                        '-c:a', 'aac', '-b:a', '128k',
+                        '-f', 'mpegts', 'pipe:1'
                     ]
                     ffmpeg_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
                     while True:
