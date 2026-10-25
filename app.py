@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 import time
 import threading
 import subprocess
+import queue
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from bs4 import BeautifulSoup
@@ -722,6 +723,8 @@ def save_settings_api():
         config["settings"]["engine_live_buffer"] = data["engine_live_buffer"]
     if "engine_disk_cache" in data:
         config["settings"]["engine_disk_cache"] = data["engine_disk_cache"]
+    if "server_ram_buffer_mb" in data:
+        config["settings"]["server_ram_buffer_mb"] = data["server_ram_buffer_mb"]
         
     save_config(config)
     
@@ -1158,7 +1161,74 @@ def stream(channel_id):
                 
             req = connect_results.get('req')
             if req:
-                yield from req.iter_content(chunk_size=1024 * 1024)
+                ram_buffer_mb = int(settings.get("server_ram_buffer_mb", 4))
+                if ram_buffer_mb > 0:
+                    chunk_size = 64 * 1024
+                    max_chunks = max(32, int(((ram_buffer_mb + 2) * 1024 * 1024) / chunk_size))
+                    target_prebuffer_bytes = ram_buffer_mb * 1024 * 1024
+                    
+                    stream_queue = queue.Queue(maxsize=max_chunks)
+                    stop_event = threading.Event()
+                    
+                    def producer():
+                        try:
+                            for chunk in req.iter_content(chunk_size=chunk_size):
+                                if stop_event.is_set():
+                                    break
+                                if chunk:
+                                    while not stop_event.is_set():
+                                        try:
+                                            stream_queue.put(chunk, timeout=0.5)
+                                            break
+                                        except queue.Full:
+                                            continue
+                        except Exception as pe:
+                            logging.warning(f"RAM Buffer producer ended: {pe}")
+                        finally:
+                            stream_queue.put(None)
+                            
+                    prod_thread = threading.Thread(target=producer, daemon=True)
+                    prod_thread.start()
+                    
+                    # Pre-buffering phase (accumulate in RAM up to target_bytes or 3.5s timeout)
+                    buffered_bytes = 0
+                    prebuffer_start = time.time()
+                    prebuffer_chunks = []
+                    
+                    while time.time() - prebuffer_start < 3.5 and buffered_bytes < target_prebuffer_bytes and not stop_event.is_set():
+                        try:
+                            item = stream_queue.get(timeout=0.1)
+                            if item is None:
+                                prebuffer_chunks.append(None)
+                                break
+                            prebuffer_chunks.append(item)
+                            buffered_bytes += len(item)
+                        except queue.Empty:
+                            continue
+                            
+                    logging.info(f"RAM Buffer pre-filled {buffered_bytes / (1024*1024):.2f} MB in {time.time() - prebuffer_start:.2f}s for channel {channel_id}")
+                    
+                    try:
+                        # Flush pre-buffered chunks immediately (burst to client)
+                        for item in prebuffer_chunks:
+                            if item is None:
+                                return
+                            yield item
+                            
+                        # Stream live chunks as they arrive from queue
+                        while not stop_event.is_set():
+                            try:
+                                item = stream_queue.get(timeout=10)
+                                if item is None:
+                                    break
+                                yield item
+                            except queue.Empty:
+                                logging.warning(f"RAM Buffer starved on channel {channel_id}")
+                                break
+                    finally:
+                        stop_event.set()
+                else:
+                    yield from req.iter_content(chunk_size=1024 * 1024)
             else:
                 logging.error(f"All sources for channel {channel_id} failed!")
                 text_error = translations.gettext("ERROR", lang)

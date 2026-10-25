@@ -127,7 +127,13 @@ translations = {
         "Streams Disponibles": "Available Streams",
         "Canal EPG (Asociación)": "EPG Channel (Guide Match)",
         "orígenes": "sources",
-        "Sin coincidencia EPG": "No EPG Match"
+        "Sin coincidencia EPG": "No EPG Match",
+        "Búfer en RAM del Servidor": "Server RAM Buffer",
+        "Almacena unos segundos de vídeo en la memoria RAM del servidor antes y durante la emisión para absorber fluctuaciones de red y evitar cortes en apps de Smart TV. Cero escrituras en SSD.": "Stores a few seconds of video in server RAM before and during playback to absorb network jitter and prevent stuttering on Smart TV apps. Zero SSD writes.",
+        "Desactivado (Directo)": "Disabled (Direct)",
+        "2 MB (~2-3 seg)": "2 MB (~2-3 sec)",
+        "4 MB (~4-5 seg, Recomendado)": "4 MB (~4-5 sec, Recommended)",
+        "8 MB (~8-10 seg, Conexiones lentas)": "8 MB (~8-10 sec, Slow connections)"
     }
 }
 
