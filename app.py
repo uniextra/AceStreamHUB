@@ -62,6 +62,59 @@ channels_db = [] # final list of unified channels
 
 active_clients_count = 0
 active_streams = {} # channel_id -> dict with telemetry and clients map
+active_engine_sessions = {} # ace_id -> command_url
+active_engine_sessions_lock = threading.Lock()
+last_client_disconnect_time = time.time()
+
+def stop_engine_stream(ace_id: str, command_url: str = None):
+    """Sends an explicit stop command to AceStream Engine to immediately drop swarm & free memory."""
+    if not ace_id and not command_url:
+        return
+        
+    urls_to_try = []
+    if command_url:
+        urls_to_try.append(f"{command_url}?method=stop" if "?" not in command_url else f"{command_url}&method=stop")
+        
+    with active_engine_sessions_lock:
+        cached_cmd = active_engine_sessions.pop(ace_id, None)
+        if cached_cmd and cached_cmd != command_url:
+            urls_to_try.append(f"{cached_cmd}?method=stop" if "?" not in cached_cmd else f"{cached_cmd}&method=stop")
+            
+    for u in urls_to_try:
+        try:
+            requests.get(u, timeout=2.0)
+            logging.info(f"Engine stream explicitly stopped via: {u}")
+        except Exception as e:
+            logging.debug(f"Failed to stop engine stream via {u}: {e}")
+
+def engine_lifecycle_worker():
+    """Background monitor: when no clients are viewing channels, reclaims AceStream engine resources."""
+    while True:
+        time.sleep(10)
+        try:
+            config = load_config()
+            settings = config.get("settings", {})
+            if not settings.get("engine_idle_cleanup_enabled", True):
+                continue
+                
+            idle_timeout = int(settings.get("engine_idle_timeout", 60))
+            
+            with active_clients_lock:
+                current_clients = active_clients_count
+                
+            if current_clients == 0:
+                idle_seconds = time.time() - last_client_disconnect_time
+                if idle_seconds >= idle_timeout:
+                    with active_engine_sessions_lock:
+                        sessions_to_stop = list(active_engine_sessions.items())
+                    if sessions_to_stop:
+                        logging.info(f"Engine Lifecycle: System idle for {int(idle_seconds)}s with {len(sessions_to_stop)} lingering sessions. Cleaning up...")
+                        for aid, cmd_url in sessions_to_stop:
+                            stop_engine_stream(aid, cmd_url)
+        except Exception as e:
+            logging.error(f"Error in engine_lifecycle_worker: {e}")
+
+threading.Thread(target=engine_lifecycle_worker, daemon=True).start()
 
 scheduler = BackgroundScheduler()
 
@@ -811,6 +864,12 @@ def save_settings_api():
         config["settings"]["language"] = data["language"]
     if "auto_discard_enabled" in data:
         config["settings"]["auto_discard_enabled"] = data["auto_discard_enabled"]
+    if "hot_failover_enabled" in data:
+        config["settings"]["hot_failover_enabled"] = data["hot_failover_enabled"]
+    if "engine_idle_cleanup_enabled" in data:
+        config["settings"]["engine_idle_cleanup_enabled"] = data["engine_idle_cleanup_enabled"]
+    if "engine_idle_timeout" in data:
+        config["settings"]["engine_idle_timeout"] = int(data["engine_idle_timeout"])
     if "stream_timeout" in data:
         config["settings"]["stream_timeout"] = data["stream_timeout"]
     if "engine_live_buffer" in data:
@@ -839,6 +898,18 @@ def save_settings_api():
         logging.error(f"Failed to write engine_args.txt: {e}")
         
     return jsonify({"status": "ok"})
+
+@app.route('/api/engine/cleanup', methods=['POST'])
+def api_engine_cleanup():
+    """Manually trigger cleanup of all lingering AceStream engine sessions."""
+    reclaimed = 0
+    with active_engine_sessions_lock:
+        sessions = list(active_engine_sessions.items())
+    for aid, cmd_url in sessions:
+        stop_engine_stream(aid, cmd_url)
+        reclaimed += 1
+    logging.info(f"Manual engine cleanup invoked: {reclaimed} session(s) stopped.")
+    return jsonify({"status": "ok", "reclaimed_sessions": reclaimed})
 
 @app.route('/api/reorder_channels', methods=['POST'])
 def reorder_channels_api():
@@ -1121,6 +1192,7 @@ def stream(channel_id):
     
     settings = config.get("settings", {})
     auto_discard = settings.get("auto_discard_enabled", True)
+    hot_failover_enabled = settings.get("hot_failover_enabled", True)
     timeout = int(settings.get("stream_timeout", 30))
     proxy_url = os.environ.get('ACESTREAM_URL', 'http://acexy:8080')
     
@@ -1172,6 +1244,7 @@ def stream(channel_id):
         
     def stream_generator():
         global active_clients_count
+        global last_client_disconnect_time
         with active_clients_lock:
             active_clients_count += 1
             
@@ -1179,27 +1252,110 @@ def stream(channel_id):
         speed_start = time.time()
         chunk_size = 128 * 1024
         
+        current_req = req
+        current_ace_id = connected_ace_id
+        failed_ids = set()
+        
         try:
-            for chunk in req.iter_content(chunk_size=chunk_size):
-                if not chunk:
-                    continue
-                now = time.time()
-                chunk_len = len(chunk)
-                speed_bytes += chunk_len
+            while True:
+                client_disconnected = False
+                upstream_failed = False
                 
-                if now - speed_start >= 1.0:
-                    current_kbps = int((speed_bytes * 8) / (1024 * (now - speed_start)))
-                    speed_bytes = 0
-                    speed_start = now
+                try:
+                    for chunk in current_req.iter_content(chunk_size=chunk_size):
+                        if not chunk:
+                            continue
+                        now = time.time()
+                        chunk_len = len(chunk)
+                        speed_bytes += chunk_len
+                        
+                        if now - speed_start >= 1.0:
+                            current_kbps = int((speed_bytes * 8) / (1024 * (now - speed_start)))
+                            speed_bytes = 0
+                            speed_start = now
+                            with active_streams_lock:
+                                if channel_id in active_streams:
+                                    active_streams[channel_id]["kbps"] = current_kbps
+                                    
+                        with active_streams_lock:
+                            if channel_id in active_streams:
+                                active_streams[channel_id]["total_bytes"] += chunk_len
+                                
+                        try:
+                            yield chunk
+                        except (GeneratorExit, BrokenPipeError, ConnectionResetError):
+                            client_disconnected = True
+                            break
+                            
+                    # If iter_content finished without client disconnect, upstream terminated
+                    if not client_disconnected:
+                        upstream_failed = True
+                except (requests.exceptions.RequestException, socket.error, Exception) as e:
+                    if not client_disconnected:
+                        logging.warning(f"Upstream stream error on {current_ace_id} for channel {channel_id}: {e}")
+                        upstream_failed = True
+                        
+                if client_disconnected:
+                    logging.info(f"Client {client_id} disconnected from channel {channel_id}")
+                    break
+                    
+                if upstream_failed:
+                    if not hot_failover_enabled:
+                        logging.info(f"Stream ended for channel {channel_id} and Hot Failover is disabled.")
+                        break
+                        
+                    failed_ids.add(current_ace_id)
+                    logging.warning(f"[HOT FAILOVER] Upstream dropped on {current_ace_id} for channel {channel_id}. Seeking failover...")
+                    
+                    # Penalize failed source in SQLite DB
+                    db.save_scan(current_ace_id, False, 0.0, "Desconexión en directo (Hot Failover)")
+                    
+                    # Close dead upstream
+                    try:
+                        current_req.close()
+                    except Exception:
+                        pass
+                    stop_engine_stream(current_ace_id)
+                    
+                    # Candidate Ace IDs: unvisited valid IDs, then any remaining channel IDs
+                    candidates = [aid for aid in valid_ace_ids if aid not in failed_ids]
+                    if not candidates:
+                        all_channel_ids = channel.get("ace_ids", [])
+                        candidates = [aid for aid in all_channel_ids if aid not in failed_ids and aid != current_ace_id]
+                        
+                    if not candidates:
+                        logging.error(f"[HOT FAILOVER] No alternative Ace IDs available for channel {channel_id}.")
+                        break
+                        
+                    recovered = False
                     with active_streams_lock:
                         if channel_id in active_streams:
-                            active_streams[channel_id]["kbps"] = current_kbps
+                            active_streams[channel_id]["status"] = "Recuperando (Hot Failover)..."
                             
-                with active_streams_lock:
-                    if channel_id in active_streams:
-                        active_streams[channel_id]["total_bytes"] += chunk_len
-                        
-                yield chunk
+                    for next_id in candidates:
+                        logging.info(f"[HOT FAILOVER] Trying failover to {next_id} for channel {channel_id}...")
+                        try:
+                            new_url = f"{proxy_url}/ace/getstream?id={next_id}"
+                            new_req = requests.get(new_url, stream=True, timeout=min(timeout, 15))
+                            if new_req.status_code == 200:
+                                current_req = new_req
+                                current_ace_id = next_id
+                                recovered = True
+                                logging.info(f"[HOT FAILOVER] SUCCESS: Channel {channel_id} recovered seamlessly with ID {next_id}")
+                                with active_streams_lock:
+                                    if channel_id in active_streams:
+                                        active_streams[channel_id]["ace_id"] = next_id
+                                        active_streams[channel_id]["status"] = "DIRECTO (Failover Activo)"
+                                break
+                            else:
+                                failed_ids.add(next_id)
+                        except Exception as ex:
+                            logging.error(f"[HOT FAILOVER] Candidate {next_id} failed: {ex}")
+                            failed_ids.add(next_id)
+                            
+                    if not recovered:
+                        logging.error(f"[HOT FAILOVER] All failover candidates failed for channel {channel_id}. Terminating stream.")
+                        break
         finally:
             with active_streams_lock:
                 if channel_id in active_streams:
@@ -1210,11 +1366,14 @@ def stream(channel_id):
                         
             with active_clients_lock:
                 active_clients_count = max(0, active_clients_count - 1)
-                
+                if active_clients_count == 0:
+                    last_client_disconnect_time = time.time()
+                    
             try:
-                req.close()
+                current_req.close()
             except Exception:
                 pass
+            stop_engine_stream(current_ace_id)
                 
     return Response(stream_with_context(stream_generator()), mimetype="video/mp2t")
 
@@ -1247,6 +1406,7 @@ def perform_channel_scan(chno, limit=None):
         res_label = "SD"
         peers = 0
         speed_kbps = 0
+        command_url = None
         
         try:
             engine_url = os.environ.get('ENGINE_URL', 'http://acestream-engine:6878')
@@ -1257,6 +1417,7 @@ def perform_channel_scan(chno, limit=None):
                 if "response" in data and data["response"]:
                     stat_url = data["response"].get("stat_url")
                     playback_url = data["response"].get("playback_url")
+                    command_url = data["response"].get("command_url")
                     
                     if stat_url and playback_url:
                         time.sleep(2.5)
@@ -1300,6 +1461,12 @@ def perform_channel_scan(chno, limit=None):
                         info = f"{res_label} | {br_label} | Peers: {peers}"
         except Exception as e:
             logging.error(f"Test error for {aid}: {e}")
+        finally:
+            if command_url:
+                try:
+                    requests.get(f"{command_url}?method=stop", timeout=2.0)
+                except Exception:
+                    pass
             
         elapsed = time.time() - start
         

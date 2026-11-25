@@ -143,7 +143,18 @@ translations = {
         "Atención": "Warning",
         "Recuperando búfer P2P...": "Recovering P2P buffer...",
         "Cargando P2P...": "Loading P2P...",
-        "Buscando peers...": "Searching peers..."
+        "Buscando peers...": "Searching peers...",
+        "Conmutación en Caliente (Hot Failover)": "In-Stream Hot Failover",
+        "Si el origen activo cae a mitad de la emisión, cambia automáticamente en caliente al siguiente Ace ID del canal sin cortar la conexión con el reproductor.": "If the active source drops mid-broadcast, automatically switch on-the-fly to the next available Ace ID without dropping the player's connection.",
+        "Liberación de Memoria por Inactividad": "Engine Idle Resource Reclaim",
+        "Cierra los enjambres P2P y libera memoria del motor AceStream cuando ningún cliente esté viendo la televisión.": "Closes P2P swarms and reclaims AceStream engine RAM when no clients are watching television.",
+        "Tiempo de Inactividad del Motor": "Engine Idle Timeout",
+        "Segundos de inactividad tras desconectarse el último espectador antes de purgar los enjambres P2P.": "Seconds of inactivity after the last viewer disconnects before purging P2P swarms.",
+        "Mantenimiento del Motor": "Engine Maintenance",
+        "Fuerza el cierre inmediato de cualquier enjambre P2P y purga la memoria RAM del motor AceStream.": "Forces immediate closure of any P2P swarm and purges AceStream engine RAM.",
+        "Purgar Enjambres y RAM": "Purge Swarms & RAM",
+        "Purgando...": "Purging...",
+        "¡RAM y Enjambres Liberados!": "RAM & Swarms Released!"
     }
 }
 
