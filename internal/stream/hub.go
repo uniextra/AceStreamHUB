@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -115,6 +116,7 @@ type Hub struct {
 
 	sessionsMu     sync.Mutex
 	engineSessions map[string]string // aceID -> commandURL
+	statURLs       map[string]string // aceID -> statURL
 
 	peersMu    sync.Mutex
 	peersCache map[string]peersEntry
@@ -125,13 +127,13 @@ type Hub struct {
 
 // NewHub constructs a Hub and starts the background engine lifecycle worker.
 func NewHub(ctx context.Context, cfgMgr *config.Manager, dbStore *db.Store, chanStore *channels.Store) *Hub {
-	proxyURL := strings.TrimRight(os.Getenv("ACESTREAM_URL"), "/")
-	if proxyURL == "" {
-		proxyURL = "http://acexy:8080"
-	}
 	engineURL := strings.TrimRight(os.Getenv("ENGINE_URL"), "/")
 	if engineURL == "" {
 		engineURL = "http://acestream-engine:6878"
+	}
+	proxyURL := strings.TrimRight(os.Getenv("ACESTREAM_URL"), "/")
+	if proxyURL == "" {
+		proxyURL = engineURL
 	}
 
 	// Streaming HTTP client deliberately omits overall Timeout so live broadcasts stay open indefinitely;
@@ -141,9 +143,9 @@ func NewHub(ctx context.Context, cfgMgr *config.Manager, dbStore *db.Store, chan
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
-		MaxIdleConns:        32,
-		IdleConnTimeout:     60 * time.Second,
-		DisableCompression:  true,
+		MaxIdleConns:       32,
+		IdleConnTimeout:    60 * time.Second,
+		DisableCompression: true,
 	}
 
 	h := &Hub{
@@ -155,6 +157,7 @@ func NewHub(ctx context.Context, cfgMgr *config.Manager, dbStore *db.Store, chan
 		activeStreams:        make(map[string]*ChannelStream),
 		lastClientDisconnect: time.Now(),
 		engineSessions:       make(map[string]string),
+		statURLs:             make(map[string]string),
 		peersCache:           make(map[string]peersEntry),
 		streamHTTP:           &http.Client{Transport: transport},
 		ctrlHTTP:             &http.Client{Timeout: 3 * time.Second},
@@ -164,7 +167,7 @@ func NewHub(ctx context.Context, cfgMgr *config.Manager, dbStore *db.Store, chan
 	return h
 }
 
-// ProxyURL returns the configured upstream proxy URL (acexy or engine).
+// ProxyURL returns the configured upstream stream URL (engine or external proxy).
 func (h *Hub) ProxyURL() string { return h.proxyURL }
 
 // EngineURL returns the configured raw AceStream engine API URL.
@@ -191,6 +194,7 @@ func (h *Hub) StopEngineStream(aceID, commandURL string) {
 		urls = append(urls, appendStopMethod(commandURL))
 	}
 	h.sessionsMu.Lock()
+	delete(h.statURLs, aceID)
 	if cached, ok := h.engineSessions[aceID]; ok {
 		delete(h.engineSessions, aceID)
 		if cached != "" && cached != commandURL {
@@ -476,16 +480,78 @@ func (cs *ChannelStream) closeActiveBody() {
 
 func (h *Hub) connectFirstWorking(ids []string, chID, chName string, timeout time.Duration) (*http.Response, string, error) {
 	for _, aceID := range ids {
-		streamURL := fmt.Sprintf("%s/ace/getstream?id=%s", h.proxyURL, aceID)
-		log.Printf("Connecting channel %s (%s) from %s (timeout=%v)", chID, chName, streamURL, timeout)
-		resp, err := h.dialLiveStream(streamURL, timeout)
+		log.Printf("Connecting channel %s (%s) ace_id=%s via %s (timeout=%v)", chID, chName, aceID, h.proxyURL, timeout)
+		resp, err := h.dialAceStream(aceID, timeout)
 		if err != nil {
-			log.Printf("Fallback: failed to connect to %s: %v", streamURL, err)
+			log.Printf("Fallback: failed to connect to %s (%s): %v", aceID, h.proxyURL, err)
 			continue
 		}
 		return resp, aceID, nil
 	}
 	return nil, "", ErrAllSourcesFailed
+}
+
+// dialAceStream opens an upstream stream for aceID. When connected directly to acestream-engine,
+// it negotiates format=json first to capture command_url and stat_url for instant session teardown
+// and peer telemetry, falling back to direct /ace/getstream?id=... if needed.
+func (h *Hub) dialAceStream(aceID string, headerTimeout time.Duration) (*http.Response, error) {
+	if h.proxyURL == h.engineURL {
+		jsonURL := fmt.Sprintf("%s/ace/getstream?id=%s&format=json", h.engineURL, aceID)
+		ctx, cancel := context.WithTimeout(context.Background(), headerTimeout)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, jsonURL, nil)
+		if err == nil {
+			resp, reqErr := h.streamHTTP.Do(req)
+			if reqErr == nil {
+				var gsPayload struct {
+					Response *struct {
+						PlaybackURL string `json:"playback_url"`
+						CommandURL  string `json:"command_url"`
+						StatURL     string `json:"stat_url"`
+					} `json:"response"`
+				}
+				decErr := json.NewDecoder(resp.Body).Decode(&gsPayload)
+				_ = resp.Body.Close()
+				cancel()
+
+				if resp.StatusCode == http.StatusOK && decErr == nil && gsPayload.Response != nil && gsPayload.Response.PlaybackURL != "" {
+					playbackURL := rewriteBaseURL(gsPayload.Response.PlaybackURL, h.engineURL)
+					commandURL := rewriteBaseURL(gsPayload.Response.CommandURL, h.engineURL)
+					statURL := rewriteBaseURL(gsPayload.Response.StatURL, h.engineURL)
+
+					if commandURL != "" {
+						h.RegisterEngineSession(aceID, commandURL)
+					}
+					if statURL != "" {
+						h.sessionsMu.Lock()
+						h.statURLs[aceID] = statURL
+						h.sessionsMu.Unlock()
+					}
+					return h.dialLiveStream(playbackURL, headerTimeout)
+				}
+			} else {
+				cancel()
+			}
+		} else {
+			cancel()
+		}
+	}
+
+	streamURL := fmt.Sprintf("%s/ace/getstream?id=%s", h.proxyURL, aceID)
+	return h.dialLiveStream(streamURL, headerTimeout)
+}
+
+func rewriteBaseURL(rawURL, baseURL string) string {
+	if rawURL == "" || baseURL == "" {
+		return rawURL
+	}
+	parsedRaw, err1 := url.Parse(rawURL)
+	parsedBase, err2 := url.Parse(baseURL)
+	if err1 != nil || err2 != nil || parsedBase.Host == "" {
+		return rawURL
+	}
+	parsedRaw.Scheme = parsedBase.Scheme
+	parsedRaw.Host = parsedBase.Host
+	return parsedRaw.String()
 }
 
 // dialLiveStream opens an upstream stream using ResponseHeaderTimeout so the TCP connection
@@ -605,8 +671,7 @@ func (h *Hub) runProducer(
 					return
 				}
 				log.Printf("[HOT FAILOVER] Trying failover to %s for channel %s...", candidate, cs.channelID)
-				nextURL := fmt.Sprintf("%s/ace/getstream?id=%s", h.proxyURL, candidate)
-				r, dialErr := h.dialLiveStream(nextURL, time.Duration(failoverTimeout)*time.Second)
+				r, dialErr := h.dialAceStream(candidate, time.Duration(failoverTimeout)*time.Second)
 				if dialErr == nil {
 					nextResp = r
 					nextID = candidate
@@ -737,11 +802,22 @@ func (h *Hub) FetchPeers(aceID string) int {
 	}
 	h.peersMu.Unlock()
 
-	endpoints := []string{
-		fmt.Sprintf("%s/ace/stat?id=%s", h.proxyURL, aceID),
+	var endpoints []string
+	h.sessionsMu.Lock()
+	if sessionStat := h.statURLs[aceID]; sessionStat != "" {
+		endpoints = append(endpoints, sessionStat)
+	}
+	h.sessionsMu.Unlock()
+
+	endpoints = append(endpoints,
 		fmt.Sprintf("%s/ace/stat?id=%s", h.engineURL, aceID),
 		fmt.Sprintf("%s/stat/%s", h.engineURL, aceID),
-		fmt.Sprintf("%s/stat/%s", h.proxyURL, aceID),
+	)
+	if h.proxyURL != h.engineURL {
+		endpoints = append(endpoints,
+			fmt.Sprintf("%s/ace/stat?id=%s", h.proxyURL, aceID),
+			fmt.Sprintf("%s/stat/%s", h.proxyURL, aceID),
+		)
 	}
 
 	statClient := &http.Client{Timeout: 1 * time.Second}
