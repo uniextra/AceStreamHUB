@@ -1,100 +1,95 @@
-{% extends "base.html" %}
+{{define "header_title"}}Channels & EPG Mapping{{end}}
 
-{% block header_title %}Channels & EPG Mapping{% endblock %}
-
-{% block header_actions %}
+{{define "header_actions"}}
 <div class="flex items-center gap-3">
     <div class="text-right hidden sm:block">
-        <p class="font-label-sm text-on-surface-variant uppercase tracking-wider mb-0.5">{{ _('Canales Mapeados') }}</p>
-        <p class="font-body-md text-primary font-bold leading-none">{{ channels|selectattr("mapped_epg_id")|list|length }} / {{ channels|length }}</p>
+        <p class="font-label-sm text-on-surface-variant uppercase tracking-wider mb-0.5">{{t .Lang "Canales Mapeados"}}</p>
+        <p class="font-body-md text-primary font-bold leading-none">{{mappedCount .Channels}} / {{len .Channels}}</p>
     </div>
     <button onclick="openManualModal()" class="flex items-center gap-2 bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/30 px-4 py-2 rounded-lg transition-colors font-label-sm uppercase tracking-wider">
         <span class="material-symbols-outlined text-[18px]">add</span>
-        <span class="hidden md:inline">{{ _('Canal Manual') }}</span>
+        <span class="hidden md:inline">{{t .Lang "Canal Manual"}}</span>
     </button>
     <button id="btn-test-all" onclick="testAllChannels()" class="flex items-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 px-4 py-2 rounded-lg transition-colors font-label-sm uppercase tracking-wider">
         <span class="material-symbols-outlined text-[18px]">speed</span>
-        <span id="btn-test-all-text" class="hidden md:inline">{{ _('Testear Todos') }}</span>
+        <span id="btn-test-all-text" class="hidden md:inline">{{t .Lang "Testear Todos"}}</span>
     </button>
 </div>
-{% endblock %}
+{{end}}
 
-{% block head %}
+{{define "head"}}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <style>
     .sortable-ghost { opacity: 0.4; background-color: rgba(0, 240, 255, 0.1); }
     .drag-handle { cursor: grab; }
     .drag-handle:active { cursor: grabbing; }
 </style>
-{% endblock %}
+{{end}}
 
-{% block content %}
+{{define "content"}}
 <div class="glass-panel rounded-xl p-md mb-lg">
     <p class="font-body-md text-on-surface-variant mb-6">
-        {{ _('Asocia tus canales Acestream a un ID oficial de EPG. Al mapearlos, la lista M3U resultante incluirá la guía de programación.') }}
+        {{t .Lang "Asocia tus canales Acestream a un ID oficial de EPG. Al mapearlos, la lista M3U resultante incluirá la guía de programación."}}
     </p>
 
     <!-- Header Row -->
     <div class="hidden md:grid grid-cols-12 gap-4 px-4 py-2 border-b border-white/10 mb-4 font-label-sm text-on-surface-variant uppercase tracking-wider">
-        <div class="col-span-5">{{ _('Nombre del Canal Acestream') }}</div>
-        <div class="col-span-3 text-center">{{ _('Streams Disponibles') }}</div>
-        <div class="col-span-4">{{ _('Canal EPG (Asociación)') }}</div>
+        <div class="col-span-5">{{t .Lang "Nombre del Canal Acestream"}}</div>
+        <div class="col-span-3 text-center">{{t .Lang "Streams Disponibles"}}</div>
+        <div class="col-span-4">{{t .Lang "Canal EPG (Asociación)"}}</div>
     </div>
 
     <!-- Mappings Table -->
     <div id="mappings-table" class="space-y-3">
-        {% for c in channels %}
-        <div class="bg-surface-container-low border border-white/5 rounded-lg overflow-hidden group hover:border-white/10 transition-colors" id="row-{{ c.GuideNumber }}">
+        {{range $c := .Channels}}
+        <div class="bg-surface-container-low border border-white/5 rounded-lg overflow-hidden group hover:border-white/10 transition-colors" id="row-{{$c.GuideNumber}}">
             
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center relative z-10">
-                <!-- Channel Name & Drag Handle -->
                 <div class="col-span-1 md:col-span-5 flex items-center gap-3">
                     <div class="drag-handle text-on-surface-variant hover:text-primary transition-colors pr-2">
                         <span class="material-symbols-outlined">drag_indicator</span>
                     </div>
                     <div class="sequence-number font-display-lg text-[24px] text-surface-variant w-8 text-center font-black">
-                        {{ c.SequenceNumber }}
+                        {{$c.SequenceNumber}}
                     </div>
-                    {% if c.mapped_epg_logo %}
+                    {{if $c.MappedEPGLogo}}
                     <div class="w-10 h-10 rounded bg-white/5 flex items-center justify-center p-1 border border-white/10 shrink-0">
-                        <img src="{{ c.mapped_epg_logo }}" alt="logo" class="max-w-full max-h-full object-contain">
+                        <img src="{{$c.MappedEPGLogo}}" alt="logo" class="max-w-full max-h-full object-contain">
                     </div>
-                    {% else %}
+                    {{else}}
                     <div class="w-10 h-10 rounded bg-white/5 flex items-center justify-center border border-white/10 shrink-0">
                         <span class="font-label-sm text-on-surface-variant opacity-50">?</span>
                     </div>
-                    {% endif %}
-                    <span class="font-body-lg font-semibold text-on-surface truncate" title="{{ c.GuideName }}">{{ c.GuideName }}</span>
+                    {{end}}
+                    <span class="font-body-lg font-semibold text-on-surface truncate" title="{{$c.GuideName}}">{{$c.GuideName}}</span>
                 </div>
                 
-                <!-- Sources Count -->
                 <div class="col-span-1 md:col-span-3 flex items-center md:justify-center gap-2">
-                    <span class="font-body-md text-on-surface-variant">{{ c.ace_ids | length }} {{ _('orígenes') }}</span>
-                    <button onclick="toggleDetails('{{ c.GuideNumber }}')" class="p-1 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center justify-center border border-primary/20" title="View Sources">
-                        <span id="caret-{{ c.GuideNumber }}" class="material-symbols-outlined text-[18px] transition-transform duration-300">expand_more</span>
+                    <span class="font-body-md text-on-surface-variant">{{len $c.AceIDs}} {{t $.Lang "orígenes"}}</span>
+                    <button onclick="toggleDetails('{{$c.GuideNumber}}')" class="p-1 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center justify-center border border-primary/20" title="View Sources">
+                        <span id="caret-{{$c.GuideNumber}}" class="material-symbols-outlined text-[18px] transition-transform duration-300">expand_more</span>
                     </button>
                 </div>
                 
-                <!-- EPG Select -->
                 <div class="col-span-1 md:col-span-4">
-                    <select data-channel-id="{{ c.GuideNumber }}" class="epg-select w-full bg-surface-container-highest border border-white/10 text-on-surface font-body-md rounded-lg focus:ring-primary focus:border-primary p-2.5 transition-colors cursor-pointer appearance-none">
-                        <option value="">-- {{ _('Sin coincidencia EPG') }} --</option>
-                        {% for e in epg_channels %}
-                            <option value="{{ e.id }}" class="bg-surface-container-highest" {% if c.mapped_epg_id == e.id %}selected{% endif %}>
-                                {{ e.name }}
+                    <select data-channel-id="{{$c.GuideNumber}}" class="epg-select w-full bg-surface-container-highest border border-white/10 text-on-surface font-body-md rounded-lg focus:ring-primary focus:border-primary p-2.5 transition-colors cursor-pointer appearance-none">
+                        <option value="">-- {{t $.Lang "Sin coincidencia EPG"}} --</option>
+                        {{range $e := $.EPGChannels}}
+                            <option value="{{$e.ID}}" class="bg-surface-container-highest" {{if eq $c.MappedEPGID $e.ID}}selected{{end}}>
+                                {{$e.Name}}
                             </option>
-                        {% endfor %}
+                        {{end}}
                     </select>
                 </div>
             </div>
 
             <!-- Details Panel -->
-            <div id="details-{{ c.GuideNumber }}" class="hidden bg-background/50 border-t border-white/5 p-4 flex-col gap-4">
+            <div id="details-{{$c.GuideNumber}}" class="hidden bg-background/50 border-t border-white/5 p-4 flex-col gap-4">
                 <div class="flex justify-between items-center">
-                    <h4 class="font-headline-md text-[16px] text-on-surface">{{ _('Orígenes Disponibles') }}</h4>
-                    <button id="btn-test-{{ c.GuideNumber }}" onclick="testChannel('{{ c.GuideNumber }}')" class="flex items-center gap-1 bg-surface-variant hover:bg-surface-bright text-on-surface px-3 py-1.5 rounded-lg border border-outline-variant transition-colors font-label-sm">
+                    <h4 class="font-headline-md text-[16px] text-on-surface">{{t $.Lang "Orígenes Disponibles"}}</h4>
+                    <button id="btn-test-{{$c.GuideNumber}}" onclick="testChannel('{{$c.GuideNumber}}')" class="flex items-center gap-1 bg-surface-variant hover:bg-surface-bright text-on-surface px-3 py-1.5 rounded-lg border border-outline-variant transition-colors font-label-sm">
                         <span class="material-symbols-outlined text-[16px]">play_arrow</span>
-                        {{ _('Testear Todos los Orígenes') }}
+                        {{t $.Lang "Testear Todos los Orígenes"}}
                     </button>
                 </div>
                 
@@ -103,61 +98,60 @@
                         <thead>
                             <tr class="border-b border-white/5 text-on-surface-variant font-label-sm uppercase tracking-wider">
                                 <th class="pb-2 font-bold">Ace ID</th>
-                                <th class="pb-2 px-2 font-bold">{{ _('Resolución') }}</th>
-                                <th class="pb-2 px-2 font-bold">{{ _('Peers') }}</th>
-                                <th class="pb-2 px-2 font-bold">{{ _('Velocidad') }}</th>
-                                <th class="pb-2 px-2 font-bold">{{ _('Tiempo de Test') }}</th>
-                                <th class="pb-2 px-2 text-right font-bold">{{ _('Hace') }}</th>
+                                <th class="pb-2 px-2 font-bold">{{t $.Lang "Resolución"}}</th>
+                                <th class="pb-2 px-2 font-bold">{{t $.Lang "Peers"}}</th>
+                                <th class="pb-2 px-2 font-bold">{{t $.Lang "Velocidad"}}</th>
+                                <th class="pb-2 px-2 font-bold">{{t $.Lang "Tiempo de Test"}}</th>
+                                <th class="pb-2 px-2 text-right font-bold">{{t $.Lang "Hace"}}</th>
                                 <th class="pb-2 text-right font-bold w-16"></th>
                             </tr>
                         </thead>
                         <tbody>
-                        {% for aid in c.ace_ids %}
-                        {% set s = scan_db.get(aid) %}
-                            <tr id="tr-{{ c.GuideNumber }}-{{ aid }}" class="border-b border-white/5 {% if c.preferred_id == aid %}bg-primary/5{% endif %} hover:bg-surface-container-highest transition-colors">
+                        {{range $aid := $c.AceIDs}}
+                        {{$s := index $.ScanDB $aid}}
+                            <tr id="tr-{{$c.GuideNumber}}-{{$aid}}" class="border-b border-white/5 {{if eq $c.PreferredID $aid}}bg-primary/5{{end}} hover:bg-surface-container-highest transition-colors">
                                 <td class="py-2 font-mono text-sm text-on-surface">
                                     <div class="flex items-center gap-2">
-                                        {{ aid[:8] }}...{{ aid[-4:] }}
-                                        <button onclick="copyToClipboard('{{ aid }}', this)" class="text-on-surface-variant hover:text-white" title="{{ _('Copiar ID') }}">
+                                        {{slice8 $aid}}...{{last4 $aid}}
+                                        <button onclick="copyToClipboard('{{$aid}}', this)" class="text-on-surface-variant hover:text-white" title="{{t $.Lang "Copiar ID"}}">
                                             <span class="material-symbols-outlined text-[14px]">content_copy</span>
                                         </button>
                                     </div>
                                 </td>
-                                <td id="resolucion-{{ c.GuideNumber }}-{{ aid }}" class="py-2 px-2 text-on-surface-variant font-body-sm">{{ s.resolution if s else 'N/A' }}</td>
-                                <td id="peers-{{ c.GuideNumber }}-{{ aid }}" class="py-2 px-2 text-on-surface-variant font-body-sm">{{ s.peers if s else 'N/A' }}</td>
-                                <td id="velocidad-{{ c.GuideNumber }}-{{ aid }}" class="py-2 px-2 text-on-surface-variant font-body-sm">{{ s.bitrate if s else 'N/A' }}</td>
-                                <td id="res-{{ c.GuideNumber }}-{{ aid }}" class="py-2 px-2 text-on-surface-variant font-body-sm">{{ '%.1f'|format(s.time) ~ 's' if s and s.time else 'N/A' }}</td>
+                                <td id="resolucion-{{$c.GuideNumber}}-{{$aid}}" class="py-2 px-2 text-on-surface-variant font-body-sm">{{if $s.LastUpdated}}{{$s.Resolution}}{{else}}N/A{{end}}</td>
+                                <td id="peers-{{$c.GuideNumber}}-{{$aid}}" class="py-2 px-2 text-on-surface-variant font-body-sm">{{if $s.LastUpdated}}{{$s.Peers}}{{else}}N/A{{end}}</td>
+                                <td id="velocidad-{{$c.GuideNumber}}-{{$aid}}" class="py-2 px-2 text-on-surface-variant font-body-sm">{{if $s.LastUpdated}}{{$s.Bitrate}}{{else}}N/A{{end}}</td>
+                                <td id="res-{{$c.GuideNumber}}-{{$aid}}" class="py-2 px-2 text-on-surface-variant font-body-sm">{{if and $s.LastUpdated (gt $s.Time 0.0)}}{{fmt1 $s.Time}}s{{else}}N/A{{end}}</td>
                                 <td class="py-2 px-2 text-right text-on-surface-variant font-body-sm">
-                                    {% if s and s.last_updated %}
-                                    {{ s.minutes_ago }} {{ _('minutos') }}
-                                    {% else %}
+                                    {{if $s.LastUpdated}}
+                                    {{$s.MinutesAgo}} {{t $.Lang "minutos"}}
+                                    {{else}}
                                     -
-                                    {% endif %}
+                                    {{end}}
                                 </td>
                                 <td class="py-2 text-right font-body-sm">
                                     <div class="flex justify-end gap-2 items-center">
-                                        <button id="star-{{ c.GuideNumber }}-{{ aid }}" onclick="setPrimary('{{ c.GuideNumber }}', '{{ aid }}')" class="{% if c.preferred_id == aid %}text-yellow-400{% else %}text-on-surface-variant{% endif %} hover:text-yellow-400 transition-colors" title="{{ _('Marcar como Primario') }}">
-                                            <span class="material-symbols-outlined text-[18px]">{% if c.preferred_id == aid %}star{% else %}star_border{% endif %}</span>
+                                        <button id="star-{{$c.GuideNumber}}-{{$aid}}" onclick="setPrimary('{{$c.GuideNumber}}', '{{$aid}}')" class="{{if eq $c.PreferredID $aid}}text-yellow-400{{else}}text-on-surface-variant{{end}} hover:text-yellow-400 transition-colors" title="{{t $.Lang "Marcar como Primario"}}">
+                                            <span class="material-symbols-outlined text-[18px]">{{if eq $c.PreferredID $aid}}star{{else}}star_border{{end}}</span>
                                         </button>
-                                        <button onclick="deleteSourceId('{{ c.GuideNumber }}', '{{ aid }}')" class="text-on-surface-variant hover:text-error transition-colors" title="{{ _('Eliminar ID') }}">
+                                        <button onclick="deleteSourceId('{{$c.GuideNumber}}', '{{$aid}}')" class="text-on-surface-variant hover:text-error transition-colors" title="{{t $.Lang "Eliminar ID"}}">
                                             <span class="material-symbols-outlined text-[18px]">delete</span>
                                         </button>
                                     </div>
                                 </td>
                             </tr>
-                        {% endfor %}
+                        {{end}}
                         </tbody>
                     </table>
                 </div>
             </div>
-            
         </div>
-        {% else %}
+        {{else}}
         <div class="text-center p-8 border border-dashed border-white/10 rounded-xl">
             <span class="material-symbols-outlined text-4xl text-on-surface-variant mb-2">live_tv</span>
-            <p class="font-body-md text-on-surface-variant">{{ _('No channels discovered yet. Go to Sources and add one!') }}</p>
+            <p class="font-body-md text-on-surface-variant">{{t .Lang "No channels discovered yet. Go to Sources and add one!"}}</p>
         </div>
-        {% endfor %}
+        {{end}}
     </div>
 </div>
 
@@ -165,21 +159,21 @@
 <div id="manual-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm">
     <div class="bg-surface-container border border-white/10 rounded-xl p-6 max-w-md w-full shadow-2xl mx-4">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="font-headline-md text-on-surface">{{ _('Añadir Canal / Origen Manual') }}</h3>
+            <h3 class="font-headline-md text-on-surface">{{t .Lang "Añadir Canal / Origen Manual"}}</h3>
             <button onclick="closeManualModal()" class="text-on-surface-variant hover:text-white transition-colors">
                 <span class="material-symbols-outlined">close</span>
             </button>
         </div>
         <div class="space-y-4">
             <div>
-                <label class="font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1">{{ _('Nombre del Canal') }}</label>
-                <input type="text" id="manual_channel_name" list="channel_names_list" class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:border-primary font-body-md" placeholder="{{ _('Ej: HBO o Canal Nuevo') }}">
+                <label class="font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1">{{t .Lang "Nombre del Canal"}}</label>
+                <input type="text" id="manual_channel_name" list="channel_names_list" class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:border-primary font-body-md" placeholder="{{t .Lang "Ej: HBO o Canal Nuevo"}}">
                 <datalist id="channel_names_list">
-                    {% for c in channels %}
-                    <option value="{{ c.GuideName }}"></option>
-                    {% endfor %}
+                    {{range .Channels}}
+                    <option value="{{.GuideName}}"></option>
+                    {{end}}
                 </datalist>
-                <p class="text-[12px] text-on-surface-variant mt-1">{{ _('Elige un canal existente para añadirle el ID, o escribe uno nuevo.') }}</p>
+                <p class="text-[12px] text-on-surface-variant mt-1">{{t .Lang "Elige un canal existente para añadirle el ID, o escribe uno nuevo."}}</p>
             </div>
             <div>
                 <label class="font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1">Ace ID</label>
@@ -187,15 +181,39 @@
             </div>
             <button onclick="saveManualChannel(this)" class="w-full flex justify-center items-center gap-2 bg-primary hover:bg-primary-hover text-on-primary py-2 rounded-lg font-label-md uppercase tracking-wider transition-colors mt-2">
                 <span class="material-symbols-outlined text-[18px]">save</span>
-                {{ _('Guardar') }}
+                {{t .Lang "Guardar"}}
             </button>
         </div>
     </div>
 </div>
-{% endblock %}
+{{end}}
 
-{% block scripts %}
+{{define "scripts"}}
 <script>
+function copyToClipboard(text, btn) {
+    const icon = btn ? btn.querySelector('.material-symbols-outlined') : null;
+    const markCopied = () => {
+        if (icon) {
+            icon.innerText = 'check';
+            setTimeout(() => { icon.innerText = 'content_copy'; }, 1500);
+        }
+    };
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(markCopied).catch(() => {});
+    }
+}
+
+async function autoSave(evt) {
+    const select = evt.target;
+    const chId = select.getAttribute('data-channel-id');
+    const epgId = select.value;
+    await fetch('/api/mappings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ [chId]: epgId })
+    });
+}
+
 function toggleDetails(chno) {
     const details = document.getElementById(`details-${chno}`);
     const caret = document.getElementById(`caret-${chno}`);
@@ -219,49 +237,27 @@ async function testAllChannels() {
         document.getElementById('btn-test-all-text').innerText = "Stopping...";
         return;
     }
-    
     isTestingAll = true;
     stopTesting = false;
     const btnText = document.getElementById('btn-test-all-text');
     const icon = document.querySelector('#btn-test-all .material-symbols-outlined');
-    
-    // Find all channel IDs
-    const selects = document.querySelectorAll('.epg-select');
-    const channels = Array.from(selects).map(s => s.getAttribute('data-channel-id'));
-    
+    const channels = Array.from(document.querySelectorAll('.epg-select')).map(s => s.getAttribute('data-channel-id'));
     icon.style.animation = 'spin 1s linear infinite';
-    
     for (let i = 0; i < channels.length; i++) {
         if (stopTesting) break;
         const chno = channels[i];
-        
         btnText.innerText = `Testing ${i+1} / ${channels.length}...`;
-        
-        // Expand details if hidden
         const detailsEl = document.getElementById('details-' + chno);
-        if (detailsEl && detailsEl.classList.contains('hidden')) {
-            toggleDetails(chno);
-        }
-        
-        // Scroll to the channel
+        if (detailsEl && detailsEl.classList.contains('hidden')) toggleDetails(chno);
         const row = document.getElementById('row-' + chno);
-        if (row) {
-            row.scrollIntoView({behavior: "smooth", block: "center"});
-        }
-        
-        // Test and wait
+        if (row) row.scrollIntoView({behavior: "smooth", block: "center"});
         await testChannel(chno);
-        
-        // Small delay to let the engine breathe
         await new Promise(r => setTimeout(r, 1000));
     }
-    
     isTestingAll = false;
     icon.style.animation = 'none';
     btnText.innerText = stopTesting ? "Test All Channels" : "Test Complete!";
-    if (!stopTesting) {
-        setTimeout(() => { btnText.innerText = "Test All Channels"; }, 3000);
-    }
+    if (!stopTesting) setTimeout(() => { btnText.innerText = "Test All Channels"; }, 3000);
 }
 
 async function testChannel(chno) {
@@ -269,34 +265,28 @@ async function testChannel(chno) {
     const originalContent = btn.innerHTML;
     btn.innerHTML = `<span class="material-symbols-outlined text-[16px]" style="animation: spin 1s linear infinite;">sync</span> Testing...`;
     btn.disabled = true;
-
     try {
         const response = await fetch(`/api/test_channel/${chno}`, { method: 'POST' });
         const data = await response.json();
-        
-        data.results.forEach(res => {
+        (data.results || []).forEach(res => {
             const elTime = document.getElementById(`res-${chno}-${res.id}`);
             const elRes = document.getElementById(`resolucion-${chno}-${res.id}`);
             const elPeers = document.getElementById(`peers-${chno}-${res.id}`);
             const elVelocidad = document.getElementById(`velocidad-${chno}-${res.id}`);
-            
             if (elTime) {
                 if (res.success) {
                     elTime.style.color = '#34C759';
                     elTime.innerText = `${res.time.toFixed(1)}s`;
-                    
                     if (res.info) {
                         let parts = res.info.split('|').map(s => s.trim());
                         if (parts.length >= 3) {
                             if (elRes) elRes.innerText = parts[0];
                             if (elVelocidad) elVelocidad.innerText = parts[1];
                             if (elPeers) elPeers.innerText = parts[2].replace("Peers:", "").trim();
-                        } else {
-                            if (elRes) elRes.innerText = res.info;
-                        }
+                        } else if (elRes) elRes.innerText = res.info;
                     }
                 } else {
-                    elTime.style.color = '#ffb4ab'; // Stitch error color
+                    elTime.style.color = '#ffb4ab';
                     elTime.innerText = 'Offline';
                     if (elRes) elRes.innerText = 'N/A';
                     if (elPeers) elPeers.innerText = 'N/A';
@@ -308,21 +298,14 @@ async function testChannel(chno) {
                 }
             }
         });
-
         if (data.success) {
             btn.innerHTML = `<span class="material-symbols-outlined text-[16px] text-green-400">check</span> Complete`;
-            
-            // Un-star all rows in this channel
-            document.querySelectorAll(`[id^="tr-${chno}-"]`).forEach(tr => {
-                tr.classList.remove('bg-primary/5');
-            });
+            document.querySelectorAll(`[id^="tr-${chno}-"]`).forEach(tr => tr.classList.remove('bg-primary/5'));
             document.querySelectorAll(`[id^="star-${chno}-"]`).forEach(starBtn => {
                 starBtn.querySelector('span').innerText = 'star_border';
                 starBtn.classList.remove('text-yellow-400');
                 starBtn.classList.add('text-on-surface-variant');
             });
-            
-            // Star the best one
             if (data.best_id) {
                 const bestTr = document.getElementById(`tr-${chno}-${data.best_id}`);
                 const bestStar = document.getElementById(`star-${chno}-${data.best_id}`);
@@ -333,7 +316,6 @@ async function testChannel(chno) {
                     bestStar.classList.add('text-yellow-400');
                 }
             }
-            
             setTimeout(() => { btn.innerHTML = originalContent; btn.disabled = false; }, 3000);
         } else {
             btn.innerHTML = `All Failed`;
@@ -346,25 +328,18 @@ async function testChannel(chno) {
     }
 }
 
-
 async function setPrimary(guideNumber, aceId) {
     await fetch(`/api/channels/${guideNumber}/primary`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ ace_id: aceId })
     });
-    
-    // Un-star all rows in this channel
-    document.querySelectorAll(`[id^="tr-${guideNumber}-"]`).forEach(tr => {
-        tr.classList.remove('bg-primary/5');
-    });
+    document.querySelectorAll(`[id^="tr-${guideNumber}-"]`).forEach(tr => tr.classList.remove('bg-primary/5'));
     document.querySelectorAll(`[id^="star-${guideNumber}-"]`).forEach(starBtn => {
         starBtn.classList.remove('text-yellow-400');
         starBtn.classList.add('text-on-surface-variant');
         starBtn.querySelector('span').innerText = 'star_border';
     });
-    
-    // Star the selected one
     const bestTr = document.getElementById(`tr-${guideNumber}-${aceId}`);
     const bestStar = document.getElementById(`star-${guideNumber}-${aceId}`);
     if (bestTr) bestTr.classList.add('bg-primary/5');
@@ -376,34 +351,31 @@ async function setPrimary(guideNumber, aceId) {
 }
 
 async function deleteSourceId(guideNumber, aceId) {
-    if(confirm("{{ _('¿Estás seguro de que quieres eliminar este origen de este canal?') }}")) {
+    if(confirm("{{t .Lang "¿Estás seguro de que quieres eliminar este origen de este canal?"}}")) {
         await fetch(`/api/channels/${guideNumber}/id/${aceId}`, { method: 'DELETE' });
         window.location.reload();
     }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-save on dropdown change
     document.querySelectorAll('.epg-select').forEach(select => {
         select.addEventListener('change', autoSave);
     });
-    
-    // Make mappings table sortable
     var el = document.getElementById('mappings-table');
     if (el) {
-        var sortable = Sortable.create(el, {
+        Sortable.create(el, {
             handle: '.drag-handle',
             animation: 150,
             ghostClass: 'sortable-ghost',
-            onEnd: function (evt) {
-                // Reorder channels
+            onEnd: function () {
                 const rows = document.querySelectorAll('#mappings-table > div');
                 const customOrder = [];
-                rows.forEach(r => {
+                rows.forEach((r, idx) => {
                     const chno = r.id.replace('row-', '');
                     customOrder.push(chno);
+                    const seqEl = r.querySelector('.sequence-number');
+                    if (seqEl) seqEl.innerText = idx + 1;
                 });
-                
                 fetch('/api/reorder_channels', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -425,21 +397,13 @@ function closeManualModal() {
 async function saveManualChannel(btn) {
     const name = document.getElementById('manual_channel_name').value.trim();
     const aceId = document.getElementById('manual_ace_id').value.trim();
-    if (!name || !aceId) {
-        alert("Faltan datos");
-        return;
-    }
-    
-    // Validar formato Ace ID (40 caracteres hexadecimales)
-    const hexRegex = /^[a-fA-F0-9]{40}$/;
-    if (!hexRegex.test(aceId)) {
+    if (!name || !aceId) { alert("Faltan datos"); return; }
+    if (!/^[a-fA-F0-9]{40}$/.test(aceId)) {
         alert("El Ace ID no es válido. Debe contener exactamente 40 caracteres hexadecimales.");
         return;
     }
-    
     btn.disabled = true;
-    btn.innerHTML = `<span class="material-symbols-outlined animate-spin text-[18px]">refresh</span> {{ _('Guardando...') }}`;
-    
+    btn.innerHTML = `<span class="material-symbols-outlined animate-spin text-[18px]">refresh</span> {{t .Lang "Guardando..."}}`;
     await fetch('/api/channels/manual', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -448,4 +412,4 @@ async function saveManualChannel(btn) {
     window.location.reload();
 }
 </script>
-{% endblock %}
+{{end}}

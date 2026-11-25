@@ -38,6 +38,7 @@ services:
       - "${WEB_PORT:-5004}:${WEB_PORT:-5004}"
     environment:
       - ACESTREAM_URL=http://acexy:8080
+      - ENGINE_URL=http://acestream-engine:6878
       - DATA_DIR=/app/config
       - WEB_PORT=${WEB_PORT:-5004}
     volumes:

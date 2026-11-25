@@ -1,10 +1,10 @@
-<!DOCTYPE html>
-<html class="dark" lang="es">
+{{define "base.html"}}<!DOCTYPE html>
+<html class="dark" lang="{{.Lang}}">
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>{% block title %}AceStream Hub{% endblock %}</title>
-<link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+<title>{{block "title" .}}AceStream Hub{{end}}</title>
+<link rel="icon" type="image/jpeg" href="/static/img/logo.jpg">
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
@@ -118,8 +118,6 @@
     .transition-spring {
         transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
-    
-    /* Custom styles for toggle switches to match iOS style */
     .toggle-checkbox:checked {
         right: 0;
         border-color: #00f0ff;
@@ -127,8 +125,6 @@
     .toggle-checkbox:checked + .toggle-label {
         background-color: #00f0ff;
     }
-    
-    /* Background Glow Effects */
     .bg-glow-1 {
         position: fixed;
         top: -20%;
@@ -149,12 +145,11 @@
         z-index: -1;
         pointer-events: none;
     }
-    
     @keyframes spin {
         100% { transform: rotate(360deg); }
     }
 </style>
-{% block head %}{% endblock %}
+{{block "head" .}}{{end}}
 </head>
 <body class="bg-background text-on-surface font-body-md antialiased min-h-screen">
 <div class="bg-glow-1"></div>
@@ -162,35 +157,34 @@
 <!-- SideNavBar -->
 <nav class="hidden md:flex h-screen w-64 fixed left-0 top-0 bg-surface/80 dark:bg-surface/80 backdrop-blur-xl border-r border-white/10 shadow-2xl flex-col py-lg z-50">
     <div class="px-md mb-lg mt-4 flex items-center gap-3">
-        <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="AceStream Hub Logo" class="w-10 h-10 rounded-xl shadow-lg">
+        <img src="/static/img/logo.jpg" alt="AceStream Hub Logo" class="w-10 h-10 rounded-xl shadow-lg">
         <h1 class="font-display-lg text-primary tracking-tighter text-[28px] leading-tight">AceStream Hub</h1>
     </div>
     <div class="flex-1 flex flex-col gap-xs px-base">
-        <!-- Active: Inicio -->
-        <a class="flex items-center gap-sm px-sm py-sm rounded-lg {% if request.path == '/dashboard' %}text-primary font-bold border-r-4 border-primary bg-primary/10{% else %}text-on-surface-variant hover:text-on-surface hover:bg-white/5{% endif %} transition-all duration-200" href="{{ url_for('dashboard') }}">
-            <span class="material-symbols-outlined" {% if request.path == '/dashboard' %}style="font-variation-settings: 'FILL' 1;"{% endif %}>dashboard</span>
-            <span class="font-body-md text-body-md">{{ _('Inicio') }}</span>
+        <a class="flex items-center gap-sm px-sm py-sm rounded-lg {{if eq .Base.Path "/dashboard"}}text-primary font-bold border-r-4 border-primary bg-primary/10{{else}}text-on-surface-variant hover:text-on-surface hover:bg-white/5{{end}} transition-all duration-200" href="/dashboard">
+            <span class="material-symbols-outlined" {{if eq .Base.Path "/dashboard"}}style="font-variation-settings: 'FILL' 1;"{{end}}>dashboard</span>
+            <span class="font-body-md text-body-md">{{t .Lang "Inicio"}}</span>
         </a>
-        <a class="flex items-center gap-sm px-sm py-sm rounded-lg {% if request.path == '/channels' %}text-primary font-bold border-r-4 border-primary bg-primary/10{% else %}text-on-surface-variant hover:text-on-surface hover:bg-white/5{% endif %} transition-all duration-200" href="{{ url_for('channels_view') }}">
-            <span class="material-symbols-outlined" {% if request.path == '/channels' %}style="font-variation-settings: 'FILL' 1;"{% endif %}>live_tv</span>
-            <span class="font-body-md text-body-md">{{ _('Canales') }}</span>
+        <a class="flex items-center gap-sm px-sm py-sm rounded-lg {{if eq .Base.Path "/channels"}}text-primary font-bold border-r-4 border-primary bg-primary/10{{else}}text-on-surface-variant hover:text-on-surface hover:bg-white/5{{end}} transition-all duration-200" href="/channels">
+            <span class="material-symbols-outlined" {{if eq .Base.Path "/channels"}}style="font-variation-settings: 'FILL' 1;"{{end}}>live_tv</span>
+            <span class="font-body-md text-body-md">{{t .Lang "Canales"}}</span>
         </a>
-        <a class="flex items-center gap-sm px-sm py-sm rounded-lg {% if request.path == '/epg' %}text-primary font-bold border-r-4 border-primary bg-primary/10{% else %}text-on-surface-variant hover:text-on-surface hover:bg-white/5{% endif %} transition-all duration-200" href="{{ url_for('epg_view') }}">
-            <span class="material-symbols-outlined" {% if request.path == '/epg' %}style="font-variation-settings: 'FILL' 1;"{% endif %}>calendar_view_day</span>
-            <span class="font-body-md text-body-md">{{ _('Guía EPG') }}</span>
+        <a class="flex items-center gap-sm px-sm py-sm rounded-lg {{if eq .Base.Path "/epg"}}text-primary font-bold border-r-4 border-primary bg-primary/10{{else}}text-on-surface-variant hover:text-on-surface hover:bg-white/5{{end}} transition-all duration-200" href="/epg">
+            <span class="material-symbols-outlined" {{if eq .Base.Path "/epg"}}style="font-variation-settings: 'FILL' 1;"{{end}}>calendar_view_day</span>
+            <span class="font-body-md text-body-md">{{t .Lang "Guía EPG"}}</span>
         </a>
-        <a class="flex items-center gap-sm px-sm py-sm rounded-lg {% if request.path == '/sources' %}text-primary font-bold border-r-4 border-primary bg-primary/10{% else %}text-on-surface-variant hover:text-on-surface hover:bg-white/5{% endif %} transition-all duration-200" href="{{ url_for('sources') }}">
-            <span class="material-symbols-outlined" {% if request.path == '/sources' %}style="font-variation-settings: 'FILL' 1;"{% endif %}>sensors</span>
+        <a class="flex items-center gap-sm px-sm py-sm rounded-lg {{if eq .Base.Path "/sources"}}text-primary font-bold border-r-4 border-primary bg-primary/10{{else}}text-on-surface-variant hover:text-on-surface hover:bg-white/5{{end}} transition-all duration-200" href="/sources">
+            <span class="material-symbols-outlined" {{if eq .Base.Path "/sources"}}style="font-variation-settings: 'FILL' 1;"{{end}}>sensors</span>
             <span class="font-body-md text-body-md">Sources</span>
         </a>
-        <a class="flex items-center gap-sm px-sm py-sm rounded-lg {% if request.path == '/settings' %}text-primary font-bold border-r-4 border-primary bg-primary/10{% else %}text-on-surface-variant hover:text-on-surface hover:bg-white/5{% endif %} transition-all duration-200" href="{{ url_for('settings_view') }}">
-            <span class="material-symbols-outlined" {% if request.path == '/settings' %}style="font-variation-settings: 'FILL' 1;"{% endif %}>settings</span>
-            <span class="font-body-md text-body-md">{{ _('Ajustes') }}</span>
+        <a class="flex items-center gap-sm px-sm py-sm rounded-lg {{if eq .Base.Path "/settings"}}text-primary font-bold border-r-4 border-primary bg-primary/10{{else}}text-on-surface-variant hover:text-on-surface hover:bg-white/5{{end}} transition-all duration-200" href="/settings">
+            <span class="material-symbols-outlined" {{if eq .Base.Path "/settings"}}style="font-variation-settings: 'FILL' 1;"{{end}}>settings</span>
+            <span class="font-body-md text-body-md">{{t .Lang "Ajustes"}}</span>
         </a>
         <div class="h-px bg-white/5 my-2"></div>
-        <a class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:text-red-400 hover:bg-red-500/10 transition-all duration-200" href="{{ url_for('logout') }}">
+        <a class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant hover:text-red-400 hover:bg-red-500/10 transition-all duration-200" href="/logout">
             <span class="material-symbols-outlined">logout</span>
-            <span class="font-body-md text-body-md">{{ _('Cerrar Sesión') }}</span>
+            <span class="font-body-md text-body-md">{{t .Lang "Cerrar Sesión"}}</span>
         </a>
     </div>
 </nav>
@@ -198,27 +192,28 @@
 <!-- TopAppBar -->
 <header class="hidden md:flex fixed top-0 right-0 left-64 h-16 bg-background/60 dark:bg-background/60 backdrop-blur-md border-b border-white/5 justify-between items-center px-margin-safe z-40">
     <div class="flex items-center gap-sm text-on-surface">
-        <h2 class="font-headline-md text-headline-md">{% block header_title %}AceStream Player{% endblock %}</h2>
+        <h2 class="font-headline-md text-headline-md">{{block "header_title" .}}AceStream Player{{end}}</h2>
     </div>
     <div class="flex items-center gap-md">
-        {% block header_actions %}{% endblock %}
+        {{block "header_actions" .}}{{end}}
     </div>
 </header>
 
 <!-- Main Content Area -->
 <main class="md:ml-64 pt-20 md:pt-24 px-margin-safe pb-xl min-h-screen">
-    {% if reset_password_active %}
+    {{if .Base.ResetPasswordActive}}
     <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
         <span class="material-symbols-outlined text-red-400">warning</span>
         <div>
-            <h3 class="text-sm font-bold text-red-400">{{ _('¡Atención! Modo de reinicio de contraseña activado') }}</h3>
-            <p class="text-sm text-[rgb(var(--color-on-surface))] mt-1">{{ _('La variable de entorno') }} <code class="bg-black/30 px-1 py-0.5 rounded text-red-300">RESET_PASSWORD=true</code> {{ _('está activa en tu contenedor. Debes eliminarla de tu configuración de Docker o docker-compose.yml; de lo contrario, tu contraseña se borrará y se volverá a pedir cada vez que se reinicie el servidor.') }}</p>
+            <h3 class="text-sm font-bold text-red-400">{{t .Lang "¡Atención! Modo de reinicio de contraseña activado"}}</h3>
+            <p class="text-sm text-[rgb(var(--color-on-surface))] mt-1">{{t .Lang "La variable de entorno"}} <code class="bg-black/30 px-1 py-0.5 rounded text-red-300">RESET_PASSWORD=true</code> {{t .Lang "está activa en tu contenedor. Debes eliminarla de tu configuración de Docker o docker-compose.yml; de lo contrario, tu contraseña se borrará y se volverá a pedir cada vez que se reinicie el servidor."}}</p>
         </div>
     </div>
-    {% endif %}
-    {% block content %}{% endblock %}
+    {{end}}
+    {{block "content" .}}{{end}}
 </main>
 
-{% block scripts %}{% endblock %}
+{{block "scripts" .}}{{end}}
 </body>
 </html>
+{{end}}

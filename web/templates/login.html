@@ -1,9 +1,10 @@
-<!DOCTYPE html>
-<html lang="es" class="dark">
+{{define "login.html"}}<!DOCTYPE html>
+<html lang="{{.Lang}}" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - AceStream Hub</title>
+    <link rel="icon" type="image/jpeg" href="/static/img/logo.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
@@ -37,7 +38,6 @@
 <body class="min-h-screen flex items-center justify-center p-4">
 
     <div class="glass-panel w-full max-w-md rounded-2xl p-8 shadow-2xl relative overflow-hidden">
-        <!-- Decoration -->
         <div class="absolute -top-24 -right-24 w-48 h-48 bg-[rgb(var(--color-primary))] opacity-10 rounded-full blur-3xl pointer-events-none"></div>
         <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-[rgb(var(--color-primary))] opacity-10 rounded-full blur-3xl pointer-events-none"></div>
         
@@ -45,45 +45,46 @@
             <span class="material-symbols-outlined text-[rgb(var(--color-primary))] text-5xl mb-4">cast_connected</span>
             <h1 class="text-3xl font-bold font-['Outfit'] tracking-tight">AceStream Hub</h1>
             <p class="text-sm text-[rgb(var(--color-on-surface))]/60 mt-2">
-                {% if is_setup %}
-                    {{ _('Crea tu contraseña de acceso') }}
-                {% else %}
-                    {{ _('Autenticación requerida') }}
-                {% endif %}
+                {{if .IsSetup}}
+                    {{t .Lang "Crea tu contraseña de acceso"}}
+                {{else}}
+                    {{t .Lang "Autenticación requerida"}}
+                {{end}}
             </p>
         </div>
 
-        {% if error %}
+        {{if .Error}}
         <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6 flex items-center gap-3 relative z-10">
             <span class="material-symbols-outlined text-red-400">error</span>
-            <p class="text-sm text-red-400">{{ error }}</p>
+            <p class="text-sm text-red-400">{{.Error}}</p>
         </div>
-        {% endif %}
+        {{end}}
 
         <form method="POST" class="flex flex-col gap-4 relative z-10">
             <div>
                 <label class="block text-sm font-medium mb-1.5 text-[rgb(var(--color-on-surface))]/80">
-                    {% if is_setup %}{{ _('Nueva Contraseña') }}{% else %}{{ _('Contraseña') }}{% endif %}
+                    {{if .IsSetup}}{{t .Lang "Nueva Contraseña"}}{{else}}{{t .Lang "Contraseña"}}{{end}}
                 </label>
                 <input type="password" name="password" required autofocus
                     class="w-full bg-[rgb(var(--color-surface-container))] border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))] transition-all">
             </div>
             
-            {% if is_setup %}
+            {{if .IsSetup}}
             <div>
-                <label class="block text-sm font-medium mb-1.5 text-[rgb(var(--color-on-surface))]/80">{{ _('Confirmar Contraseña') }}</label>
+                <label class="block text-sm font-medium mb-1.5 text-[rgb(var(--color-on-surface))]/80">{{t .Lang "Confirmar Contraseña"}}</label>
                 <input type="password" name="confirm_password" required
                     class="w-full bg-[rgb(var(--color-surface-container))] border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))] transition-all">
             </div>
-            {% endif %}
+            {{end}}
 
             <button type="submit" 
                 class="mt-4 w-full bg-[rgb(var(--color-primary))]/20 hover:bg-[rgb(var(--color-primary))]/30 text-[rgb(var(--color-primary))] font-semibold rounded-lg px-4 py-3 transition-colors border border-[rgb(var(--color-primary))]/30 flex items-center justify-center gap-2">
-                <span>{% if is_setup %}{{ _('Guardar y Entrar') }}{% else %}{{ _('Iniciar Sesión') }}{% endif %}</span>
-                <span class="material-symbols-outlined text-[20px]">{% if is_setup %}save{% else %}login{% endif %}</span>
+                <span>{{if .IsSetup}}{{t .Lang "Guardar y Entrar"}}{{else}}{{t .Lang "Iniciar Sesión"}}{{end}}</span>
+                <span class="material-symbols-outlined text-[20px]">{{if .IsSetup}}save{{else}}login{{end}}</span>
             </button>
         </form>
     </div>
 
 </body>
 </html>
+{{end}}

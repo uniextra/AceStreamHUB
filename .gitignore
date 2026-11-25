@@ -1,4 +1,4 @@
-# Python
+# Python / Legacy
 __pycache__/
 *.py[cod]
 *$py.class
@@ -6,6 +6,12 @@ __pycache__/
 .env
 venv/
 env/
+
+# Go
+acestreamhub
+acestreamhub.exe
+*.test
+coverage.out
 
 # App Specific Data
 config.json
@@ -19,7 +25,6 @@ scans.db
 engine_args.txt
 *.txt
 test_*.py
-
 
 .agent/
 config/cache_*.json
