@@ -12,24 +12,6 @@ services:
     command: >
       /bin/bash -c "args=$$(cat /config/engine_args.txt 2>/dev/null || echo ''); mkdir -p /dev/shm/.ACEStream; ./start-engine --client-console --bind-all --live-cache-type memory $$args"
 
-  acexy:
-    image: ghcr.io/javinator9889/acexy:0.2.2
-    container_name: acexy
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    environment:
-      ACEXY_LISTEN_ADDR: ":8080"
-      ACEXY_SCHEME: "http"
-      ACEXY_HOST: "acestream-engine"
-      ACEXY_PORT: "6878"
-      ACEXY_NO_RESPONSE_TIMEOUT: "30s"
-      ACEXY_CLIENT_EVICTION_TIMEOUT: "30s"
-      ACEXY_EMPTY_TIMEOUT: "60s"
-      ACEXY_BUFFER_SIZE: "8MB"
-    depends_on:
-      - acestream-engine
-
   proxy-app:
     build: .
     container_name: acestream-hdhr-proxy
@@ -37,11 +19,10 @@ services:
     ports:
       - "${WEB_PORT:-5004}:${WEB_PORT:-5004}"
     environment:
-      - ACESTREAM_URL=http://acexy:8080
       - ENGINE_URL=http://acestream-engine:6878
       - DATA_DIR=/app/config
       - WEB_PORT=${WEB_PORT:-5004}
     volumes:
       - ./config:/app/config
     depends_on:
-      - acexy
+      - acestream-engine

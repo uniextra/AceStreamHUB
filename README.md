@@ -5,28 +5,29 @@
 # AceStream Hub (AceScrapper Proxy)
 
 <p align="center">
-  <a href="https://github.com/uniextra/AceScrapper/actions/workflows/docker-publish.yml"><img src="https://github.com/uniextra/AceScrapper/actions/workflows/docker-publish.yml/badge.svg" alt="Release Pipeline"></a>
+  <a href="https://github.com/uniextra/AceStreamHUB/actions/workflows/docker-publish.yml"><img src="https://github.com/uniextra/AceStreamHUB/actions/workflows/docker-publish.yml/badge.svg" alt="Release Pipeline"></a>
   <a href="https://hub.docker.com/r/uniextra/acestreamhub"><img src="https://img.shields.io/docker/pulls/uniextra/acestreamhub.svg" alt="Docker Pulls"></a>
   <img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" alt="Go 1.26">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://ko-fi.com/uniextra"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-F16061?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
 </p>
 
-AceStream Hub is a fast, lightweight IPTV proxy and M3U/XMLTV orchestrator rewritten in **Go** to seamlessly bridge AceStream P2P broadcasts with standard IPTV players (VLC, TiviMate, Kodi, IPTV Smarters Pro) and media servers via a built-in HDHomeRun tuner emulator.
+AceStream Hub is a fast, lightweight IPTV proxy and M3U/XMLTV orchestrator rewritten in **Go** to connect **directly** to `acestream-engine` and bridge AceStream P2P broadcasts to standard IPTV players (VLC, TiviMate, Kodi, IPTV Smarters Pro) and media servers via a built-in HDHomeRun tuner emulator.
 
-It ships as a **single static zero-CGO binary** (`embed.FS` templates & assets + pure-Go SQLite) inside a hardened non-root `alpine:3.21` container (~15–25 MB RAM footprint), featuring a modern frosted-glass Web Dashboard.
+It ships as a **single static zero-CGO binary** (`embed.FS` templates & assets + pure-Go SQLite) inside a hardened non-root `alpine:3.21` container (~15–25 MB RAM footprint), featuring a built-in Go stream multiplexer (removing the need for `acexy`) and a modern frosted-glass Web Dashboard.
 
 ## Branches
 
-- **`go`** *(active)*: Pure-Go single-binary rewrite with multiplexed RAM ring buffering, MPEG-TS aligned Hot Failover, and on-demand engine lifecycle management. Full drop-in compatibility with existing `config.json` (including Werkzeug PBKDF2/scrypt password hashes) and `scans.db`.
-- **`legacy`**: Original Python/Flask implementation (maintained for reference).
+- **`go`** *(active)*: Pure-Go single-binary rewrite connecting directly to `acestream-engine` with a built-in RAM ring-buffer multiplexer, MPEG-TS aligned Hot Failover, and direct `command_url?method=stop` lifecycle management. Drop-in compatible with existing `config.json` (including Werkzeug PBKDF2/scrypt password hashes) and `scans.db`.
+- **`legacy`**: Original Python/Flask implementation using `acexy` (kept for reference).
 
 ## Features
 
+- **Direct AceStream Engine Integration (No `acexy` Needed)**: Connects directly to `acestream-engine` (`format=json`), reducing the stack to just 2 containers, cutting memory usage, and capturing session `command_url`/`stat_url` for instant teardown and live peer stats. *(If you still prefer an external HTTP proxy, set `ACESTREAM_URL`.)*
 - **Go Single-Binary Architecture**: Zero-CGO static binary with embedded HTML/assets, pure-Go SQLite (`modernc.org/sqlite`), and a minimal non-root Alpine Docker image.
 - **RAM Ring-Buffer Multiplexer**: Shares a single upstream AceStream connection across multiple simultaneous IPTV viewers using a volatile ~4 MB RAM ring buffer (zero SSD/disk wear), giving late-joining clients instant playback start without stalling healthy players.
-- **In-Stream Hot Failover**: If an active AceStream source drops mid-broadcast, the hub keeps the player's HTTP socket open, penalizes the failed ID in SQLite, seamlessly dials the next quality-ranked Ace ID, aligns to the MPEG-TS `0x47` sync byte, and resumes playback automatically.
-- **On-Demand Engine Lifecycle**: Immediately stops test swarms after channel scans (`?method=stop`), closes upstream sessions when the last viewer disconnects, and runs a background idle monitor (`engine_idle_timeout`) to reclaim AceStream engine RAM and P2P connections automatically — plus a one-click manual purge button in Settings.
+- **In-Stream Hot Failover**: If an active AceStream source drops mid-broadcast, the hub keeps the player's HTTP socket open, penalizes the failed ID in SQLite, stops the dead session immediately, dials the next quality-ranked Ace ID, aligns to the MPEG-TS `0x47` sync byte, and resumes playback seamlessly.
+- **On-Demand Engine Lifecycle**: Immediately stops test swarms after channel scans (`?method=stop`), tears down the engine session as soon as the last viewer disconnects, and runs a background idle monitor (`engine_idle_timeout`) to reclaim any lingering sessions automatically — plus a one-click manual purge button in Settings.
 - **Real-Time Telemetry Dashboard**: Live monitor displaying active channels, current Ace ID, live bitrate (Mbps), P2P peer count, data transferred, uptime, and connected player IPs/agents.
 - **Dynamic M3U & EPG XML Generation**: Automatically generates `/playlist.m3u` and `/epg.xml`, ready to be ingested by any IPTV player.
 - **HDHomeRun Emulator**: Built-in network tuner emulator (`/discover.json`, `/lineup.json`) for native integration with Plex, Emby, and Jellyfin.
@@ -56,25 +57,7 @@ It ships as a **single static zero-CGO binary** (`embed.FS` templates & assets +
          - ./config:/config
        command: >
          /bin/bash -c "args=$$(cat /config/engine_args.txt 2>/dev/null || echo ''); mkdir -p /dev/shm/.ACEStream; ./start-engine --client-console --bind-all --live-cache-type memory $$args"
-         
-     acexy:
-       image: ghcr.io/javinator9889/acexy:0.2.2
-       container_name: acexy
-       restart: unless-stopped
-       ports:
-         - "8080:8080"
-       environment:
-         ACEXY_LISTEN_ADDR: ":8080"
-         ACEXY_SCHEME: "http"
-         ACEXY_HOST: "acestream-engine"
-         ACEXY_PORT: "6878"
-         ACEXY_NO_RESPONSE_TIMEOUT: "30s"
-         ACEXY_CLIENT_EVICTION_TIMEOUT: "30s"
-         ACEXY_EMPTY_TIMEOUT: "60s"
-         ACEXY_BUFFER_SIZE: "8MB"
-       depends_on:
-         - acestream-engine
-       
+
      proxy-app:
        image: uniextra/acestreamhub:latest
        container_name: acestream-hdhr-proxy
@@ -82,7 +65,6 @@ It ships as a **single static zero-CGO binary** (`embed.FS` templates & assets +
        ports:
          - "${WEB_PORT:-5004}:${WEB_PORT:-5004}"
        environment:
-         - ACESTREAM_URL=http://acexy:8080
          - ENGINE_URL=http://acestream-engine:6878
          - DATA_DIR=/app/config
          - WEB_PORT=${WEB_PORT:-5004}
@@ -91,7 +73,7 @@ It ships as a **single static zero-CGO binary** (`embed.FS` templates & assets +
        volumes:
          - ./config:/app/config
        depends_on:
-         - acexy
+         - acestream-engine
    ```
 2. Start the stack:
    ```bash
@@ -99,7 +81,7 @@ It ships as a **single static zero-CGO binary** (`embed.FS` templates & assets +
    ```
 
 ### VPN / Gluetun Configuration (Optional)
-If you want to route all AceStream traffic through a VPN container like Gluetun, you can bind the services to the `gluetun` network space. Update your `docker-compose.yml` like this:
+If you want to route all AceStream traffic through a VPN container like Gluetun, you can bind both services to the `gluetun` network space. Update your `docker-compose.yml` like this:
 
 ```yaml
 services:
@@ -119,22 +101,6 @@ services:
       gluetun:
         condition: service_healthy
 
-  acexy:
-    image: ghcr.io/javinator9889/acexy:0.2.2
-    container_name: acexy
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      ACEXY_LISTEN_ADDR: ":8080"
-      ACEXY_SCHEME: "http"
-      ACEXY_HOST: "127.0.0.1"
-      ACEXY_PORT: "6878"
-    depends_on:
-      gluetun:
-        condition: service_healthy
-
   proxy-app:
     image: uniextra/acestreamhub:latest
     container_name: acestream-hdhr-proxy
@@ -143,7 +109,6 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
-      - ACESTREAM_URL=http://127.0.0.1:8080
       - ENGINE_URL=http://127.0.0.1:6878
       - DATA_DIR=/app/config
       - WEB_PORT=${WEB_PORT:-5004}
@@ -186,7 +151,7 @@ The `config.json` file generated locally contains your private EPG and Source UR
 
 ## Credits & Acknowledgements
 - `vstavrinov/acestream-engine` for the Dockerized AceStream Engine.
-- `javinator9889/acexy` for the AceStream to HTTP proxy engine.
+- `javinator9889/acexy` (used in the `legacy` Python stack and inspiration for the built-in Go stream multiplexer).
 
 ## License
 Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
