@@ -12,6 +12,9 @@
   <a href="https://ko-fi.com/uniextra"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-F16061?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
 </p>
 
+> [!WARNING]
+> **No longer maintained:** This project is no longer actively maintained. We recommend using **[Pipepito/acestream-scraper](https://github.com/Pipepito/acestream-scraper)** instead.
+
 AceStream Hub is a fast, lightweight IPTV proxy and M3U/XMLTV orchestrator rewritten in **Go** to connect **directly** to `acestream-engine` and bridge AceStream P2P broadcasts to standard IPTV players (VLC, TiviMate, Kodi, IPTV Smarters Pro) and media servers via a built-in HDHomeRun tuner emulator.
 
 It ships as a **single static zero-CGO binary** (`embed.FS` templates & assets + pure-Go SQLite) inside a hardened non-root `alpine:3.21` container (~15–25 MB RAM footprint), featuring a built-in Go stream multiplexer (removing the need for `acexy`) and a modern frosted-glass Web Dashboard.
