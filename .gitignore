@@ -8,8 +8,8 @@ venv/
 env/
 
 # Go
-acestreamhub
-acestreamhub.exe
+/acestreamhub
+/acestreamhub.exe
 *.test
 coverage.out
 
