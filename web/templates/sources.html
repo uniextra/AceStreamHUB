@@ -1,16 +1,14 @@
-{% extends "base.html" %}
+{{define "header_title"}}{{t .Lang "Orígenes de Canales"}}{{end}}
 
-{% block header_title %}{{ _('Orígenes de Canales') }}{% endblock %}
-
-{% block content %}
+{{define "content"}}
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-md">
-    <!-- Left Column: Add New Playlist Form (1 span on XL) -->
+    <!-- Left Column: Add New Playlist Form -->
     <div class="xl:col-span-1 space-y-md">
         <details class="group glass-panel rounded-xl glow-focus transition-all duration-300 overflow-hidden">
             <summary class="p-md cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-center justify-between font-headline-md text-headline-md text-on-surface select-none hover:text-primary transition-colors">
                 <div class="flex items-center">
                     <span class="material-symbols-outlined mr-xs text-primary">add_circle</span>
-                    <span>{{ _('Añadir Nuevo Origen') }}</span>
+                    <span>{{t .Lang "Añadir Nuevo Origen"}}</span>
                 </div>
                 <span class="material-symbols-outlined text-on-surface-variant transition-transform duration-300 group-open:rotate-180">expand_more</span>
             </summary>
@@ -18,17 +16,17 @@
             <div class="px-md pb-md pt-xs border-t border-outline-variant/20">
                 <form id="addSourceForm" class="space-y-md mt-sm flex-1 flex flex-col">
                     <div class="space-y-xs">
-                        <label class="font-label-sm text-label-sm text-on-surface-variant block uppercase tracking-wider" for="src_name">{{ _('Nombre') }}</label>
+                        <label class="font-label-sm text-label-sm text-on-surface-variant block uppercase tracking-wider" for="src_name">{{t .Lang "Nombre"}}</label>
                         <input class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-sm py-2 font-body-md text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" id="src_name" placeholder="Ej: Deportes Premium" type="text" required />
                     </div>
                     
                     <div class="space-y-xs">
-                        <label class="font-label-sm text-label-sm text-on-surface-variant block uppercase tracking-wider" for="src_type">{{ _('Tipo') }}</label>
+                        <label class="font-label-sm text-label-sm text-on-surface-variant block uppercase tracking-wider" for="src_type">{{t .Lang "Tipo"}}</label>
                         <select class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-sm py-2 font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors appearance-none" id="src_type">
-                            <option value="m3u">{{ _('M3U Playlist URL') }}</option>
-                            <option value="json">{{ _('JSON API URL') }}</option>
-                            <option value="scrape">{{ _('Web Scrape URL') }}</option>
-                            <option value="epg">{{ _('XMLTV EPG URL') }}</option>
+                            <option value="m3u">{{t .Lang "M3U Playlist URL"}}</option>
+                            <option value="json">{{t .Lang "JSON API URL"}}</option>
+                            <option value="scrape">{{t .Lang "Web Scrape URL"}}</option>
+                            <option value="epg">{{t .Lang "XMLTV EPG URL"}}</option>
                         </select>
                     </div>
 
@@ -38,7 +36,7 @@
                     </div>
 
                     <div class="space-y-xs">
-                        <label class="font-label-sm text-label-sm text-on-surface-variant block uppercase tracking-wider" for="src_interval">{{ _('Intervalo de Refresco (minutos)') }}</label>
+                        <label class="font-label-sm text-label-sm text-on-surface-variant block uppercase tracking-wider" for="src_interval">{{t .Lang "Intervalo de Refresco (minutos)"}}</label>
                         <select class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-sm py-2 font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors appearance-none" id="src_interval">
                             <option value="60" class="bg-surface-container-highest">60</option>
                             <option value="360" class="bg-surface-container-highest">360</option>
@@ -49,18 +47,17 @@
 
                     <div class="mt-auto pt-md flex space-x-sm">
                         <button class="flex-1 bg-primary hover:bg-primary-container text-on-primary font-body-md font-bold py-2 px-sm rounded-lg transition-all duration-200 shadow-[0_0_15px_rgba(0,240,255,0.2)] hover:shadow-[0_0_25px_rgba(0,240,255,0.4)] hover:scale-[1.02]" type="submit">
-                            {{ _('Añadir Nuevo Origen') }}
+                            {{t .Lang "Añadir Nuevo Origen"}}
                         </button>
                     </div>
                 </form>
             </div>
         </details>
         
-        <!-- Mini Stats Card -->
         <div class="glass-panel rounded-xl p-sm flex items-center justify-between">
             <div>
-                <p class="font-label-sm text-label-sm text-on-surface-variant uppercase">{{ _('Orígenes Activos') }}</p>
-                <p class="font-headline-md text-headline-md text-primary">{{ sources|length }}</p>
+                <p class="font-label-sm text-label-sm text-on-surface-variant uppercase">{{t .Lang "Orígenes Activos"}}</p>
+                <p class="font-headline-md text-headline-md text-primary">{{len .Sources}}</p>
             </div>
             <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
                 <span class="material-symbols-outlined text-primary text-[24px]">sensors</span>
@@ -68,63 +65,55 @@
         </div>
     </div>
     
-    <!-- Right Column: Playlist List (2 spans on XL) -->
+    <!-- Right Column: Playlist List -->
     <div class="xl:col-span-2 space-y-md">
-        {% set type_colors = {
-            'm3u': {'bg': 'bg-primary/10 border-primary/30', 'text': 'text-primary', 'dot': 'bg-primary'},
-            'json': {'bg': 'bg-secondary-container/10 border-secondary-container/30', 'text': 'text-secondary-fixed-dim', 'dot': 'bg-secondary-container'},
-            'epg': {'bg': 'bg-green-500/10 border-green-500/30', 'text': 'text-green-400', 'dot': 'bg-green-500'},
-            'scrape': {'bg': 'bg-orange-500/10 border-orange-500/30', 'text': 'text-orange-400', 'dot': 'bg-orange-500'}
-        } %}
-        
-        {% for src in sources %}
-        {% set tcolor = type_colors.get(src.type, {'bg': 'bg-primary/10 border-primary/30', 'text': 'text-primary', 'dot': 'bg-primary'}) %}
-        
+        {{range .Sources}}
+        {{$tcolor := srcColor .Type}}
         <div class="glass-panel rounded-xl p-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-md transition-all duration-200 border-l-4 border-l-primary group hover:bg-surface-container/50">
             <div class="flex-1 w-full overflow-hidden">
                 <div class="flex items-center gap-sm mb-xs">
-                    <h4 class="font-headline-md text-[18px] font-semibold text-on-surface group-hover:text-primary transition-colors truncate">{{ src.name }}</h4>
-                    <span class="inline-flex items-center gap-1 {{ tcolor.bg }} border px-2 py-0.5 rounded-full shrink-0">
-                        <span class="w-2 h-2 rounded-full {{ tcolor.dot }}"></span>
-                        <span class="font-label-sm text-[10px] {{ tcolor.text }} uppercase">{{ src.type }}</span>
+                    <h4 class="font-headline-md text-[18px] font-semibold text-on-surface group-hover:text-primary transition-colors truncate">{{.Name}}</h4>
+                    <span class="inline-flex items-center gap-1 {{$tcolor.Bg}} border px-2 py-0.5 rounded-full shrink-0">
+                        <span class="w-2 h-2 rounded-full {{$tcolor.Dot}}"></span>
+                        <span class="font-label-sm text-[10px] {{$tcolor.Text}} uppercase">{{.Type}}</span>
                     </span>
-                    {% if src.status == 'OK' or src.status == 'ok' %}
-                    <span class="bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider mr-2">{{ _('OK') }}</span>
-                    {% else %}
+                    {{if or (eq .Status "OK") (eq .Status "ok")}}
+                    <span class="bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider mr-2">{{t $.Lang "OK"}}</span>
+                    {{else}}
                     <span class="inline-flex items-center gap-1 bg-error/10 border border-error/30 px-2 py-0.5 rounded-full shrink-0">
-                        <span class="font-label-sm text-[10px] text-error uppercase">{{ src.status }}</span>
+                        <span class="font-label-sm text-[10px] text-error uppercase">{{.Status}}</span>
                     </span>
-                    {% endif %}
+                    {{end}}
                 </div>
                 
-                <p class="font-mono text-sm text-on-surface-variant truncate w-full" title="{{ src.url }}">{{ src.url }}</p>
+                <p class="font-mono text-sm text-on-surface-variant truncate w-full" title="{{.URL}}">{{.URL}}</p>
                 
                 <div class="mt-2 flex items-center gap-md font-label-sm text-[11px] text-on-surface-variant opacity-80 uppercase tracking-wider">
-                    <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">schedule</span> {{ src.interval_minutes }} {{ _('minutos') }}</span>
-                    <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">update</span> {{ src.last_run or _('Nunca') }}</span>
+                    <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">schedule</span> {{.IntervalMinutes}} {{t $.Lang "minutos"}}</span>
+                    <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">update</span> {{if .LastRun}}{{.LastRun}}{{else}}{{t $.Lang "Nunca"}}{{end}}</span>
                 </div>
             </div>
             
             <div class="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0">
-                <button aria-label="Refrescar" onclick="refreshSource('{{ src.id }}', this)" class="p-2 rounded-lg bg-surface-variant text-on-surface hover:bg-white/10 hover:text-primary transition-colors tooltip-trigger relative border border-white/5">
+                <button aria-label="Refrescar" onclick="refreshSource('{{.ID}}', this)" class="p-2 rounded-lg bg-surface-variant text-on-surface hover:bg-white/10 hover:text-primary transition-colors tooltip-trigger relative border border-white/5">
                     <span class="material-symbols-outlined">sync</span>
                 </button>
-                <button aria-label="Eliminar" onclick="deleteSource('{{ src.id }}')" class="p-2 rounded-lg bg-surface-variant text-on-surface hover:bg-error/20 hover:text-error hover:border-error/30 transition-colors tooltip-trigger relative border border-white/5">
+                <button aria-label="Eliminar" onclick="deleteSource('{{.ID}}')" class="p-2 rounded-lg bg-surface-variant text-on-surface hover:bg-error/20 hover:text-error hover:border-error/30 transition-colors tooltip-trigger relative border border-white/5">
                     <span class="material-symbols-outlined">delete</span>
                 </button>
             </div>
         </div>
-        {% else %}
+        {{else}}
         <div class="glass-panel rounded-xl p-md flex flex-col items-center justify-center text-center h-64 border-dashed">
             <span class="material-symbols-outlined text-4xl text-on-surface-variant mb-2">sensors_off</span>
-            <p class="font-body-md text-on-surface-variant">{{ _('No sources configured yet. Add one from the panel.') }}</p>
+            <p class="font-body-md text-on-surface-variant">{{t .Lang "No sources configured yet. Add one from the panel."}}</p>
         </div>
-        {% endfor %}
+        {{end}}
     </div>
 </div>
-{% endblock %}
+{{end}}
 
-{% block scripts %}
+{{define "scripts"}}
 <script>
 document.getElementById('addSourceForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -134,7 +123,6 @@ document.getElementById('addSourceForm').addEventListener('submit', async (e) =>
         url: document.getElementById('src_url').value,
         interval_minutes: document.getElementById('src_interval').value
     };
-    
     await fetch('/api/sources', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -144,7 +132,7 @@ document.getElementById('addSourceForm').addEventListener('submit', async (e) =>
 });
 
 async function deleteSource(id) {
-    if(confirm("{{ _('Are you sure you want to delete this source?') }}")) {
+    if(confirm("{{t .Lang "Are you sure you want to delete this source?"}}")) {
         await fetch(`/api/sources/${id}`, { method: 'DELETE' });
         window.location.reload();
     }
@@ -164,4 +152,4 @@ async function refreshSource(id, btn) {
     }
 }
 </script>
-{% endblock %}
+{{end}}
